@@ -1,0 +1,8 @@
+id: model-providers
+description: "Anthropic model provider (Opus 4.6, Sonnet 4.6) and model aliases. Requires ANTHROPIC_API_KEY."
+targets: ["*"]
+created: 2026-03-01T22:04:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/model-providers.json

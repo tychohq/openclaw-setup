@@ -1,0 +1,8 @@
+id: session-config
+description: "Session scope, reset policy (1yr idle), thread bindings, message queue steering"
+targets: ["*"]
+created: 2026-03-01T22:02:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/session-config.json

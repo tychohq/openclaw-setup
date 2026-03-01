@@ -1,0 +1,49 @@
+{
+  "agents": {
+    "defaults": {
+      "memorySearch": {
+        "sources": ["memory", "sessions"],
+        "extraPaths": ["."],
+        "experimental": {
+          "sessionMemory": true
+        },
+        "provider": "openai",
+        "remote": {
+          "batch": {
+            "enabled": false
+          }
+        },
+        "fallback": "none",
+        "sync": {
+          "sessions": {
+            "deltaBytes": 1,
+            "deltaMessages": 1
+          }
+        }
+      }
+    }
+  },
+  "memory": {
+    "backend": "builtin",
+    "qmd": {
+      "includeDefaultMemory": true,
+      "paths": [
+        {
+          "path": ".",
+          "name": "workspace",
+          "pattern": "**/*.md"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}

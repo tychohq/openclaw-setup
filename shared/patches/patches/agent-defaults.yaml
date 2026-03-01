@@ -1,0 +1,8 @@
+id: agent-defaults
+description: "Primary model (Opus 4.6), fallbacks, compaction, heartbeat, concurrency, and behavior defaults"
+targets: ["*"]
+created: 2026-03-01T22:00:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/agent-defaults.json
