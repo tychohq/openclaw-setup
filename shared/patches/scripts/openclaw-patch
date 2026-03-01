@@ -185,18 +185,13 @@ exec_step_config_patch() {
     local source="$FILES_DIR/$merge_json_file"
     [[ -f "$source" ]] || die "merge_file not found: $source"
 
-    if [[ ! -f "$config_file" ]]; then
-      # Init from zero: create openclaw.json from the merge content
-      mkdir -p "$(dirname "$config_file")"
-      cp "$source" "$config_file"
-      info "Config created from $merge_json_file (init from zero)"
-    else
-      local tmp
-      tmp=$(mktemp)
-      jq -s '.[0] * .[1]' "$config_file" "$source" > "$tmp"
-      mv "$tmp" "$config_file"
-      info "Config patched from $merge_json_file"
-    fi
+    [[ -f "$config_file" ]] || die "openclaw.json not found at $config_file — run 'openclaw onboard' first"
+
+    local tmp
+    tmp=$(mktemp)
+    jq -s '.[0] * .[1]' "$config_file" "$source" > "$tmp"
+    mv "$tmp" "$config_file"
+    info "Config patched from $merge_json_file"
   else
     warn "config_patch step without merge_file — use a JSON file in files/"
   fi
