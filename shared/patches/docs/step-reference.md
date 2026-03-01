@@ -53,7 +53,7 @@ Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operat
 **Rules:**
 - Deep merge: nested objects merge recursively, scalars overwrite, arrays replace.
 - Requires `jq` on the instance.
-- If `openclaw.json` doesn't exist yet, creates it from the merge content (init-from-zero).
+- Requires `openclaw.json` to exist (`openclaw onboard` creates it).
 - Never include secrets (API keys, tokens). Those stay in `.env`.
 
 ---

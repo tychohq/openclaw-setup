@@ -1,6 +1,0 @@
-{
-  "name": "openclaw-test",
-  "models": {
-    "default": "anthropic/claude-sonnet-4-20250514"
-  }
-}

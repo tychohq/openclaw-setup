@@ -92,14 +92,14 @@ test_config_patch_existing() {
   teardown
 }
 
-test_config_patch_init_from_zero() {
+test_config_patch_missing_config() {
   setup
-  # No openclaw.json exists
-  load_patch test-config-init.yaml
-  apply test-instance >/dev/null
-  [[ -f "$TEST_HOME/openclaw.json" ]]
-  jq -e '.name == "openclaw-test"' "$TEST_HOME/openclaw.json" >/dev/null
-  jq -e '.models.default == "anthropic/claude-sonnet-4-20250514"' "$TEST_HOME/openclaw.json" >/dev/null
+  # No openclaw.json exists — should fail with clear error
+  load_patch test-config-patch.yaml
+  local output
+  output="$(apply test-instance 2>&1)" || true
+  echo "$output" | grep -q "openclaw onboard"
+  [[ ! -f "$TEST_HOME/openclaw.json" ]]
   teardown
 }
 
@@ -248,7 +248,7 @@ echo ""
 run_test "file step (content_file)"       test_file_step_content_file
 run_test "file step (inline content)"     test_file_step_inline
 run_test "config_patch (existing config)" test_config_patch_existing
-run_test "config_patch (init from zero)"  test_config_patch_init_from_zero
+run_test "config_patch (missing config)"  test_config_patch_missing_config
 run_test "skill step"                     test_skill_step
 run_test "cron step"                      test_cron_step
 run_test "exec step"                      test_exec_step
