@@ -1,0 +1,8 @@
+id: browser-config
+description: "Headful browser for desktop deployments (skip on headless servers)"
+targets: ["*"]
+created: 2026-03-01T22:10:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/browser-config.json

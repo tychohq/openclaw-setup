@@ -1,0 +1,10 @@
+{
+  "discovery": {
+    "wideArea": {
+      "enabled": false
+    },
+    "mdns": {
+      "mode": "minimal"
+    }
+  }
+}

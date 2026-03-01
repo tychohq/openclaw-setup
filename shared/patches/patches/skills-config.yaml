@@ -1,0 +1,8 @@
+id: skills-config
+description: "Bundled skill allowlist, extra skill dirs, bun as node manager"
+targets: ["*"]
+created: 2026-03-01T22:09:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/skills-config.json

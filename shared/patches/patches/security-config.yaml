@@ -1,0 +1,8 @@
+id: security-config
+description: "Discovery disabled (wide-area off, mDNS minimal)"
+targets: ["*"]
+created: 2026-03-01T22:11:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/security-config.json
