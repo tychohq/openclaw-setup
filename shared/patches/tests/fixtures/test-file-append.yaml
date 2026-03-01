@@ -1,0 +1,10 @@
+id: test-file-append
+description: "Test file step with mode: append"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: file
+    path: ~/.openclaw/workspace/appendable.txt
+    content: "appended line"
+    mode: append

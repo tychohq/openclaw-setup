@@ -1,0 +1,11 @@
+id: test-file-append-marker
+description: "Test file step with mode: append and marker"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: file
+    path: ~/.openclaw/workspace/marked.txt
+    content: "## Custom Section\nSome new content"
+    mode: append
+    marker: "## Custom Section"

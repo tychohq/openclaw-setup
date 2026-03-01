@@ -147,31 +147,57 @@ exec_step() {
 
 exec_step_file() {
   local step_file="$1"
-  local target_path content_file content_inline
-  
+  local target_path content_file content_inline mode marker
+
   target_path="$(yaml_get "$step_file" "path")"
   content_file="$(yaml_get "$step_file" "content_file")"
   content_inline="$(yaml_get "$step_file" "content")"
-  
+  mode="$(yaml_get "$step_file" "mode")"
+  marker="$(yaml_get "$step_file" "marker")"
+
+  # Default mode is overwrite
+  [[ -z "$mode" ]] && mode="overwrite"
+
   # Expand ~ to $HOME
   target_path="${target_path/#\~/$HOME}"
-  
+
   [[ -z "$target_path" ]] && die "file step missing 'path'"
-  
+
   mkdir -p "$(dirname "$target_path")"
-  
+
+  # Resolve the content to write
+  local content=""
+  local source_label=""
   if [[ -n "$content_file" ]]; then
     local source_path="$FILES_DIR/$content_file"
     [[ -f "$source_path" ]] || die "content_file not found: $source_path"
-    cp "$source_path" "$target_path"
-    info "Wrote $target_path (from $content_file)"
+    content="$(cat "$source_path")"
+    source_label="from $content_file"
   elif [[ -n "$content_inline" ]]; then
-    echo "$content_inline" > "$target_path"
-    info "Wrote $target_path (inline)"
+    content="$content_inline"
+    source_label="inline"
   else
-    # Check for multi-line content block
     die "file step needs 'content_file' or 'content'"
   fi
+
+  case "$mode" in
+    overwrite)
+      printf '%s\n' "$content" > "$target_path"
+      info "Wrote $target_path ($source_label)"
+      ;;
+    append)
+      # If marker is set, only append if marker not already in file
+      if [[ -n "$marker" && -f "$target_path" ]] && grep -qF "$marker" "$target_path"; then
+        info "Skipped append to $target_path (marker already present)"
+        return 0
+      fi
+      printf '%s\n' "$content" >> "$target_path"
+      info "Appended to $target_path ($source_label)"
+      ;;
+    *)
+      die "file step unknown mode: $mode (expected overwrite or append)"
+      ;;
+  esac
 }
 
 exec_step_config_patch() {

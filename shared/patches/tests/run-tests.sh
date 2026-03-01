@@ -92,6 +92,46 @@ test_file_step_inline() {
   teardown
 }
 
+test_file_step_append() {
+  setup
+  # Create existing file
+  mkdir -p "$TEST_HOME/workspace"
+  echo "original line" > "$TEST_HOME/workspace/appendable.txt"
+  load_patch test-file-append.yaml
+  apply test-instance >/dev/null
+  # Original content should still be there
+  grep -q "original line" "$TEST_HOME/workspace/appendable.txt"
+  # Appended content should be there too
+  grep -q "appended line" "$TEST_HOME/workspace/appendable.txt"
+  teardown
+}
+
+test_file_step_append_marker() {
+  setup
+  mkdir -p "$TEST_HOME/workspace"
+  echo "existing content" > "$TEST_HOME/workspace/marked.txt"
+  load_patch test-file-append-marker.yaml
+  apply test-instance >/dev/null
+  # Marker content should be appended
+  grep -q "## Custom Section" "$TEST_HOME/workspace/marked.txt"
+  grep -q "existing content" "$TEST_HOME/workspace/marked.txt"
+  teardown
+}
+
+test_file_step_append_marker_idempotent() {
+  setup
+  mkdir -p "$TEST_HOME/workspace"
+  # File already contains the marker
+  printf 'existing content\n## Custom Section\nSome new content\n' > "$TEST_HOME/workspace/marked.txt"
+  load_patch test-file-append-marker.yaml
+  apply test-instance >/dev/null
+  # Should NOT append again — count occurrences of marker
+  local count
+  count="$(grep -c "## Custom Section" "$TEST_HOME/workspace/marked.txt")"
+  [[ "$count" -eq 1 ]]
+  teardown
+}
+
 test_config_patch_existing() {
   setup
   # Create an existing openclaw.json
@@ -281,6 +321,9 @@ echo ""
 
 run_test "file step (content_file)"       test_file_step_content_file
 run_test "file step (inline content)"     test_file_step_inline
+run_test "file step (append)"             test_file_step_append
+run_test "file step (append + marker)"    test_file_step_append_marker
+run_test "file step (marker idempotent)"  test_file_step_append_marker_idempotent
 run_test "config_patch (existing config)" test_config_patch_existing
 run_test "config_patch (missing config)"  test_config_patch_missing_config
 run_test "config_set"                     test_config_set
