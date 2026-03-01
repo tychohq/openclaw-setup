@@ -4,9 +4,9 @@ Detailed specification for each patch step type supported by `openclaw-patch`.
 
 ---
 
-## 1. `file` — Write a file
+## 1. `file` — Write or append to a file
 
-Write content to any path on the instance. Supports inline content (short strings) or external file references (anything multi-line).
+Write content to any path on the instance. Supports inline content or external file references, with overwrite or append modes.
 
 ```yaml
 - type: file
@@ -20,6 +20,16 @@ Write content to any path on the instance. Supports inline content (short string
   content: "single line content"
 ```
 
+Append mode with idempotent marker:
+
+```yaml
+- type: file
+  path: ~/.openclaw/workspace/AGENTS.md
+  content: "## Custom Section\nSome content here"
+  mode: append
+  marker: "## Custom Section"  # only append if marker not already present
+```
+
 **Fields:**
 
 | Field | Required | Description |
@@ -27,17 +37,51 @@ Write content to any path on the instance. Supports inline content (short string
 | `path` | yes | Destination path. `~` expands to `$HOME`. |
 | `content_file` | one of | Path relative to `files/` directory. |
 | `content` | one of | Inline string content. |
+| `mode` | no | `overwrite` (default) or `append`. |
+| `marker` | no | String to check for idempotent appends. Only appends if marker is not already in the file. |
 
 **Rules:**
 - Exactly one of `content_file` or `content` is required.
 - Parent directories are created automatically.
-- Overwrites existing files (no merge). For config merging, use `config_patch`.
+- `mode: overwrite` replaces the file. `mode: append` adds to end.
+- `marker` only works with `mode: append`. If the marker string exists in the file, the append is skipped.
 
 ---
 
-## 2. `config_patch` — Deep-merge into openclaw.json
+## 2. `config_set` — Set a single config field
 
-Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operator.
+Calls `openclaw config set <path> <value>` for individual config fields. Simpler than `config_patch` for basic changes.
+
+```yaml
+- type: config_set
+  path: models.default
+  value: "anthropic/claude-sonnet-4-20250514"
+```
+
+For complex objects, value can be JSON:
+
+```yaml
+- type: config_set
+  path: agent.memory
+  value: '{"enabled": true, "maxFiles": 100}'
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `path` | yes | Dot-path config key (e.g. `models.default`). |
+| `value` | yes | Value to set (string or JSON). |
+
+**Rules:**
+- Requires `openclaw` CLI on the instance.
+- No `jq` dependency needed.
+
+---
+
+## 3. `config_patch` — Deep-merge into openclaw.json
+
+Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operator. Use for bulk changes (20+ fields).
 
 ```yaml
 - type: config_patch
@@ -58,7 +102,31 @@ Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operat
 
 ---
 
-## 3. `skill` — Install a custom skill
+## 4. `mkdir` — Create directories
+
+Creates one or more directories.
+
+```yaml
+- type: mkdir
+  paths:
+    - ~/.openclaw/workspace/memory/daily
+    - ~/.openclaw/workspace/research
+    - ~/.openclaw/workspace/tools
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `paths` | yes | List of directory paths to create. `~` expands to `$HOME`. |
+
+**Rules:**
+- Creates parent directories automatically (`mkdir -p`).
+- Idempotent — no error if directory already exists.
+
+---
+
+## 5. `skill` — Install a custom skill
 
 Copies a skill directory from the repo into `~/.openclaw/skills/`.
 
@@ -82,7 +150,7 @@ Copies a skill directory from the repo into `~/.openclaw/skills/`.
 
 ---
 
-## 4. `clawhub` — Install/update ClawHub skills
+## 6. `clawhub` — Install/update ClawHub skills
 
 Installs or updates skills from the public ClawHub registry.
 
@@ -105,14 +173,19 @@ Installs or updates skills from the public ClawHub registry.
 
 ---
 
-## 5. `cron` — Register a cron job
+## 7. `cron` — Register a cron job
 
-Creates or updates a cron job definition file.
+Registers a cron job via `openclaw cron add`. Idempotent — skips if a job with the same name already exists.
 
 ```yaml
 - type: cron
   name: daily-healthcheck
-  job_file: cron/daily-healthcheck.json  # relative to files/
+  schedule: "0 9 * * *"
+  tz: America/New_York
+  session: isolated
+  message: "Run healthcheck"
+  timeout_seconds: 300
+  announce: true
 ```
 
 **Fields:**
@@ -120,15 +193,22 @@ Creates or updates a cron job definition file.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Cron job identifier. |
-| `job_file` | yes | Path to JSON job definition relative to `files/`. |
+| `schedule` | yes | Cron expression (e.g. `"0 9 * * *"`). |
+| `message` | yes | Message to send when the job fires. |
+| `tz` | no | Timezone (e.g. `America/New_York`). |
+| `session` | no | Session target (e.g. `isolated`). |
+| `timeout_seconds` | no | Job timeout in seconds. |
+| `announce` | no | Set to `true` to enable announce delivery mode. |
+| `model` | no | Model override for the cron job. |
+| `thinking` | no | Set to `true` to enable thinking mode. |
 
 **Rules:**
-- Writes the job JSON to `~/.openclaw/workspace/cron-jobs/<name>.json`.
-- Job must be separately registered via `openclaw cron add` or the gateway API.
+- Requires `openclaw` CLI on the instance.
+- Checks `openclaw cron list --json` first — skips if job name already exists.
 
 ---
 
-## 6. `exec` — Run a shell command
+## 8. `exec` — Run a shell command
 
 Escape hatch for anything the other step types can't handle.
 
@@ -150,9 +230,9 @@ Escape hatch for anything the other step types can't handle.
 
 ---
 
-## 7. `openclaw_update` — Update OpenClaw itself
+## 9. `openclaw_update` — Update OpenClaw itself
 
-Updates the OpenClaw package. Auto-detects `bun` vs `npm`.
+Calls `openclaw update --yes` to update OpenClaw. The CLI handles bun/npm detection automatically.
 
 ```yaml
 - type: openclaw_update
@@ -163,21 +243,21 @@ Updates the OpenClaw package. Auto-detects `bun` vs `npm`.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `version` | no | Target version. Defaults to `latest`. |
+| `version` | no | Target version. Defaults to `latest`. Passed as `--tag`. |
 
 **Rules:**
-- Detects package manager: if `openclaw` binary resolves to a bun path, uses `bun`; otherwise `npm`.
+- Requires `openclaw` CLI on the instance.
 - Should typically be followed by a `restart` step.
 
 ---
 
-## 8. `restart` — Restart the OpenClaw gateway
+## 10. `restart` — Restart the OpenClaw gateway
 
 ```yaml
 - type: restart
 ```
 
 **Rules:**
-- Tries `systemctl --user restart openclaw-gateway` first (Linux/systemd).
-- Falls back to `openclaw gateway restart`.
+- Prefers `openclaw gateway restart`.
+- Falls back to `systemctl --user restart openclaw-gateway` if `openclaw` binary not available.
 - Non-fatal if restart fails (warns but doesn't stop the patch).
