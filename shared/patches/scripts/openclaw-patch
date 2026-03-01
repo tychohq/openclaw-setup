@@ -323,24 +323,40 @@ exec_step_clawhub() {
 
 exec_step_cron() {
   local step_file="$1"
-  local cron_name job_file
-  
+  need_cmd openclaw
+
+  local cron_name schedule tz session message timeout_seconds announce model thinking
   cron_name="$(yaml_get "$step_file" "name")"
-  job_file="$(yaml_get "$step_file" "job_file")"
-  
+  schedule="$(yaml_get "$step_file" "schedule")"
+  tz="$(yaml_get "$step_file" "tz")"
+  session="$(yaml_get "$step_file" "session")"
+  message="$(yaml_get "$step_file" "message")"
+  timeout_seconds="$(yaml_get "$step_file" "timeout_seconds")"
+  announce="$(yaml_get "$step_file" "announce")"
+  model="$(yaml_get "$step_file" "model")"
+  thinking="$(yaml_get "$step_file" "thinking")"
+
   [[ -z "$cron_name" ]] && die "cron step missing 'name'"
-  
-  if [[ -n "$job_file" ]]; then
-    local source="$FILES_DIR/$job_file"
-    [[ -f "$source" ]] || die "job_file not found: $source"
-    
-    local dest_dir="$OPENCLAW_HOME/workspace/cron-jobs"
-    mkdir -p "$dest_dir"
-    cp "$source" "$dest_dir/${cron_name}.json"
-    info "Cron job written: $cron_name → $dest_dir/${cron_name}.json"
-    info "Note: Job needs to be registered via 'openclaw cron add' or the gateway API"
-  else
-    warn "cron step without job_file — use a JSON file in files/"
+  [[ -z "$schedule" ]] && die "cron step missing 'schedule'"
+  [[ -z "$message" ]] && die "cron step missing 'message'"
+
+  # Idempotency: skip if job with same name already exists
+  if openclaw cron list --json 2>/dev/null | jq -e --arg n "$cron_name" '.[] | select(.name == $n)' &>/dev/null; then
+    info "Cron job already exists: $cron_name (skipping)"
+    return 0
+  fi
+
+  local cmd=(openclaw cron add --name "$cron_name" --cron "$schedule" --message "$message")
+  [[ -n "$tz" ]] && cmd+=(--tz "$tz")
+  [[ -n "$session" ]] && cmd+=(--session "$session")
+  [[ -n "$timeout_seconds" ]] && cmd+=(--timeout-seconds "$timeout_seconds")
+  [[ "$announce" == "true" ]] && cmd+=(--announce)
+  [[ -n "$model" ]] && cmd+=(--model "$model")
+  [[ "$thinking" == "true" ]] && cmd+=(--thinking)
+
+  info "Registering cron job: $cron_name"
+  if ! "${cmd[@]}"; then
+    die "cron step failed: openclaw cron add --name $cron_name"
   fi
 }
 
@@ -359,39 +375,32 @@ exec_step_exec() {
 
 exec_step_openclaw_update() {
   local step_file="$1"
+  need_cmd openclaw
+
   local target_version
   target_version="$(yaml_get "$step_file" "version")"
 
-  # Auto-detect package manager: if openclaw symlink resolves to a bun path, use bun
-  local pkg_mgr="npm"
-  local openclaw_bin
-  if openclaw_bin="$(command -v openclaw 2>/dev/null)"; then
-    local resolved
-    resolved="$(readlink "$openclaw_bin" 2>/dev/null || true)"
-    if [[ "$resolved" == *bun* ]] || [[ "$openclaw_bin" == *bun* ]]; then
-      pkg_mgr="bun"
-    fi
-  elif command -v bun &>/dev/null; then
-    pkg_mgr="bun"
+  local cmd=(openclaw update --yes)
+  if [[ -n "$target_version" && "$target_version" != "latest" ]]; then
+    cmd+=(--tag "$target_version")
+    info "Updating OpenClaw to $target_version..."
+  else
+    info "Updating OpenClaw to latest..."
   fi
 
-  if [[ "$target_version" == "latest" || -z "$target_version" ]]; then
-    info "Updating OpenClaw to latest (via $pkg_mgr)..."
-    "$pkg_mgr" install -g openclaw
-  else
-    info "Updating OpenClaw to $target_version (via $pkg_mgr)..."
-    "$pkg_mgr" install -g "openclaw@$target_version"
+  if ! "${cmd[@]}"; then
+    die "openclaw_update failed"
   fi
 }
 
 exec_step_restart() {
   info "Restarting OpenClaw gateway..."
-  if command -v systemctl &>/dev/null && systemctl --user is-active openclaw-gateway &>/dev/null; then
-    systemctl --user restart openclaw-gateway
-  elif command -v openclaw &>/dev/null; then
+  if command -v openclaw &>/dev/null; then
     openclaw gateway restart || true
+  elif command -v systemctl &>/dev/null && systemctl --user is-active openclaw-gateway &>/dev/null; then
+    systemctl --user restart openclaw-gateway
   else
-    warn "Could not restart gateway — no systemctl or openclaw CLI found"
+    warn "Could not restart gateway — no openclaw CLI or systemctl found"
   fi
 }
 

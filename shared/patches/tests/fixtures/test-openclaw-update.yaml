@@ -1,0 +1,8 @@
+id: test-openclaw-update
+description: "Test openclaw_update step"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: openclaw_update
+    version: 1.2.3

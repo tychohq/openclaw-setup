@@ -1,9 +1,14 @@
 id: test-cron-step
-description: "Test cron step"
+description: "Test cron step via openclaw CLI"
 targets: ["*"]
 created: 2026-01-01T00:00:04Z
 
 steps:
   - type: cron
     name: test-cron-job
-    job_file: cron/test-job.json
+    schedule: "0 9 * * *"
+    tz: America/New_York
+    session: isolated
+    message: "Run test cron"
+    timeout_seconds: 300
+    announce: true

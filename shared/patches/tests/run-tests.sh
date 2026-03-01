@@ -188,10 +188,47 @@ test_skill_step() {
 
 test_cron_step() {
   setup
+  setup_mock_openclaw
   load_patch test-cron-step.yaml
   apply test-instance >/dev/null
-  [[ -f "$TEST_HOME/workspace/cron-jobs/test-cron-job.json" ]]
-  jq -e '.name == "test-cron-job"' "$TEST_HOME/workspace/cron-jobs/test-cron-job.json" >/dev/null
+  # Verify openclaw cron add was called with the right flags
+  local calls="$TEST_HOME/mock-openclaw-calls.txt"
+  grep -q "cron add" "$calls"
+  grep -q -- "--name test-cron-job" "$calls"
+  grep -q -- "--cron 0 9 \* \* \*" "$calls" || grep -q "0 9" "$calls"
+  grep -q -- "--message Run test cron" "$calls"
+  grep -q -- "--announce" "$calls"
+  teardown
+}
+
+test_cron_step_idempotent() {
+  setup
+  MOCK_BIN_CRON="$(mktemp -d)"
+  # Mock openclaw that returns an existing cron job
+  cat > "$MOCK_BIN_CRON/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+echo "$@" >> "${OPENCLAW_HOME}/mock-openclaw-calls.txt"
+if [[ "$1" == "cron" && "$2" == "list" && "$*" == *"--json"* ]]; then
+  echo '[{"name":"test-cron-job","schedule":"0 9 * * *"}]'
+fi
+MOCK
+  chmod +x "$MOCK_BIN_CRON/openclaw"
+  export PATH="$MOCK_BIN_CRON:$PATH"
+  load_patch test-cron-step.yaml
+  apply test-instance >/dev/null
+  # Should NOT have called cron add (skipped because job exists)
+  ! grep -q "cron add" "$TEST_HOME/mock-openclaw-calls.txt" 2>/dev/null
+  rm -rf "$MOCK_BIN_CRON"
+  teardown
+}
+
+test_openclaw_update() {
+  setup
+  setup_mock_openclaw
+  load_patch test-openclaw-update.yaml
+  apply test-instance >/dev/null
+  # Verify openclaw update --yes --tag 1.2.3 was called
+  grep -q "update --yes --tag 1.2.3" "$TEST_HOME/mock-openclaw-calls.txt"
   teardown
 }
 
@@ -206,10 +243,12 @@ test_exec_step() {
 
 test_restart_step() {
   setup
+  setup_mock_openclaw
   load_patch test-restart-step.yaml
-  # restart should not fail even if no gateway is running (non-fatal)
   apply test-instance >/dev/null
-  # Just check that the patch was marked applied
+  # Should have called openclaw gateway restart
+  grep -q "gateway restart" "$TEST_HOME/mock-openclaw-calls.txt"
+  # Patch should be marked applied
   jq -e '.["test-restart-step"] != null' "$TEST_HOME/patches/applied.json" >/dev/null
   teardown
 }
@@ -329,9 +368,11 @@ run_test "config_patch (missing config)"  test_config_patch_missing_config
 run_test "config_set"                     test_config_set
 run_test "mkdir step"                     test_mkdir_step
 run_test "skill step"                     test_skill_step
-run_test "cron step"                      test_cron_step
+run_test "cron step (openclaw CLI)"       test_cron_step
+run_test "cron step (idempotent skip)"    test_cron_step_idempotent
 run_test "exec step"                      test_exec_step
-run_test "restart step (non-fatal)"       test_restart_step
+run_test "openclaw_update (with tag)"     test_openclaw_update
+run_test "restart step (openclaw CLI)"    test_restart_step
 run_test "full multi-step patch"          test_full_patch
 run_test "idempotency (second apply=nop)" test_idempotency
 run_test "target filter (match)"          test_target_filter_match
