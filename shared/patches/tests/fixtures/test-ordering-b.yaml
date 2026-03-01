@@ -1,0 +1,8 @@
+id: test-ordering-b
+description: "Second patch (later timestamp)"
+targets: ["*"]
+created: 2026-01-02T00:00:00Z
+
+steps:
+  - type: exec
+    command: "echo B >> ~/.openclaw/order-test.txt"

@@ -1,0 +1,13 @@
+id: test-full-patch
+description: "Test patch with multiple step types"
+targets: ["*"]
+created: 2026-01-01T00:00:10Z
+
+steps:
+  - type: file
+    path: ~/.openclaw/workspace/full-test.txt
+    content: "from full patch"
+  - type: config_patch
+    merge_file: configs/test-merge.json
+  - type: exec
+    command: "echo full-patch-marker > ~/.openclaw/full-marker.txt"

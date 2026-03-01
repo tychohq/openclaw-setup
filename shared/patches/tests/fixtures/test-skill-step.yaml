@@ -1,0 +1,8 @@
+id: test-skill-step
+description: "Test skill step"
+targets: ["*"]
+created: 2026-01-01T00:00:03Z
+
+steps:
+  - type: skill
+    name: test-skill

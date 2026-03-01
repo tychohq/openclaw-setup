@@ -1,0 +1,7 @@
+id: test-restart-step
+description: "Test restart step (non-fatal)"
+targets: ["*"]
+created: 2026-01-01T00:00:06Z
+
+steps:
+  - type: restart

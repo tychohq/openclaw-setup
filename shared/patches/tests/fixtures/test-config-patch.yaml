@@ -1,0 +1,8 @@
+id: test-config-patch
+description: "Test config_patch step"
+targets: ["*"]
+created: 2026-01-01T00:00:02Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/test-merge.json
