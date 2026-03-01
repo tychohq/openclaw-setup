@@ -28,3 +28,5 @@ tfplan
 
 # Checklist local config (keep example)
 shared/checklist/checklist.conf
+tmp-current-config.json
+tmp-default-config.json
