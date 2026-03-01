@@ -2,7 +2,7 @@
 
 One command to deploy OpenClaw on AWS. The setup wizard collects everything inline — from API keys to channel tokens — and generates the Terraform config. No manual SSH or `openclaw onboard` needed.
 
-For advanced users with an existing [mac-mini-setup](https://github.com/openclaw/mac-mini-setup) repo, see [Advanced Deployment](#advanced-deployment) below.
+For advanced users, see [Advanced Deployment](#advanced-deployment) below.
 
 ## Cost (On-Demand, eu-central-1)
 
@@ -19,8 +19,8 @@ Pricing varies by region and instance size; adjust `instance_type` and `ebs_volu
 ## Quick Start (First Time)
 
 ```bash
-git clone https://github.com/janobarnard/openclaw-aws.git
-cd openclaw-aws
+git clone https://github.com/BrennerSpear/openclaw-setup.git
+cd openclaw-setup/aws
 ./setup.sh
 ```
 
@@ -87,66 +87,46 @@ Great for CI, scripting, or re-deploys where your `.env` is already populated.
 
 ## Advanced Deployment
 
-Deploy OpenClaw fully configured at boot using the companion [mac-mini-setup](https://github.com/openclaw/mac-mini-setup) repo. This gives you full control over workspace files, custom skills, cron jobs, and auth profiles.
+Deploy OpenClaw fully configured at boot using content from the monorepo. This gives you full control over workspace files, custom skills, cron jobs, and auth profiles.
 
-### Two Ways to Source Content
+### Monorepo Layout
 
-**Option A: Local clone (recommended for customization)**
-Clone mac-mini-setup locally, fill in secrets, reference with `file()`.
-
-**Option B: Fetch from GitHub (no clone needed)**
-Since mac-mini-setup is public, Terraform can read files directly from GitHub raw URLs. You only need to clone *this* repo — workspace files, skills, and cron jobs are fetched at plan time:
-
-```hcl
-# terraform.tfvars — pull non-secret files straight from GitHub
-workspace_files = {
-  "SOUL.md"  = "https://raw.githubusercontent.com/BrennerSpear/mac-mini-setup/main/openclaw-workspace/SOUL.md"
-  "USER.md"  = "https://raw.githubusercontent.com/BrennerSpear/mac-mini-setup/main/openclaw-workspace/USER.md"
-}
-```
-
-> **Note:** This requires adding an `http` data source in Terraform to fetch each URL — or you can use the simpler approach of just curling the files into local copies and using `file()`. See the tfvars example for both patterns.
-
-Secrets (API keys, tokens) should never come from GitHub — always pass those via local `file()` references or environment variables.
-
-### Sibling Repo Layout (Option A)
-
-Both repos cloned as siblings under `~/projects/`:
+Everything lives in one repo — `openclaw-setup`:
 
 ```
-~/projects/
-├── mac-mini-setup/                       # Source of truth for all OpenClaw content
-│   ├── openclaw-secrets.json             # ← fill in (from config/openclaw-config.template.json)
-│   ├── openclaw-secrets.env              # ← fill in (from config/openclaw-env.template)
-│   ├── openclaw-auth-profiles.json       # ← fill in (from config/openclaw-auth-profiles.template.json)
-│   ├── openclaw-workspace/               # workspace files (SOUL.md, USER.md, docs/, tools/, ...)
-│   ├── openclaw-skills/                  # custom skills (email/, clawdstrike/, ...)
-│   └── cron-jobs/                        # cron job JSON specs
-└── openclaw-terraform-aws/               # this repo (Terraform only — no content)
+openclaw-setup/
+├── openclaw-secrets.json                 # ← fill in (from shared/config/openclaw-config.template.json)
+├── openclaw-secrets.env                  # ← fill in (from shared/config/openclaw-env.template)
+├── openclaw-auth-profiles.json           # ← fill in (from shared/config/openclaw-auth-profiles.template.json)
+├── shared/
+│   ├── workspace/                        # workspace files (SOUL.md, USER.md, docs/, tools/, ...)
+│   ├── skills/                           # custom skills (email/, clawdstrike/, ...)
+│   ├── cron-jobs/                        # cron job JSON specs
+│   └── config/                           # config templates
+└── aws/
     └── terraform/
-        └── terraform.tfvars              # all file() paths point into ../../mac-mini-setup/
+        └── terraform.tfvars              # all file() paths point into ../../shared/ or ../
 ```
 
-`mac-mini-setup` is the single source of truth. The `terraform.tfvars` wires it to the instance using `file()` references — no content lives in this repo.
+Secrets files are gitignored and live at the repo root. The `terraform.tfvars` wires them to the instance using `file()` references.
 
 ### Advanced Workflow
 
-**1. Clone both repos:**
+**1. Clone the repo:**
 
 ```bash
 cd ~/projects
-git clone https://github.com/openclaw/mac-mini-setup.git
-git clone https://github.com/janobarnard/openclaw-aws.git openclaw-terraform-aws
+git clone https://github.com/BrennerSpear/openclaw-setup.git
 ```
 
-**2. Fill in your secrets (in mac-mini-setup):**
+**2. Fill in your secrets:**
 
 ```bash
-cd ~/projects/mac-mini-setup
+cd ~/projects/openclaw-setup
 # Start from the templates, then fill in your tokens and API keys:
-cp config/openclaw-config.template.json openclaw-secrets.json
-cp config/openclaw-env.template          openclaw-secrets.env
-cp config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
+cp shared/config/openclaw-config.template.json openclaw-secrets.json
+cp shared/config/openclaw-env.template          openclaw-secrets.env
+cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
 
 # Edit each file:
 #   openclaw-secrets.json       — channels, models, agent settings, gateway config
@@ -154,14 +134,13 @@ cp config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
 #   openclaw-auth-profiles.json — provider auth profiles
 ```
 
-These three files are gitignored in mac-mini-setup and never committed.
+These three files are gitignored and never committed.
 
 **3. Configure Terraform:**
 
 ```bash
-cd ~/projects/openclaw-terraform-aws/terraform
+cd ~/projects/openclaw-setup/aws/terraform
 cp terraform.tfvars.advanced.example terraform.tfvars
-# All file() paths already point to ../../mac-mini-setup/
 # Edit owner_name, timezone, region, or skill lists as needed.
 ```
 
@@ -177,8 +156,8 @@ Cloud-init runs automatically on first boot. After ~2 minutes, OpenClaw is runni
 
 **To update workspace files, skills, cron jobs, or config:**
 
-1. Edit the relevant files in `mac-mini-setup/`
-2. Re-run `terraform apply` from `openclaw-terraform-aws/terraform/`
+1. Edit the relevant files in the repo
+2. Re-run `terraform apply` from `aws/terraform/`
 
 When `workspace_files`, `custom_skills`, `cron_jobs`, or the config variables change, Terraform detects a `user_data` change and **replaces the instance**. Your updated content is baked in at boot on the new instance.
 
@@ -201,11 +180,11 @@ Use `terraform apply` (instance replacement) for any change you want to survive 
 
 ### Config Files
 
-| File | Template in mac-mini-setup | Destination on instance |
-|------|---------------------------|------------------------|
-| `openclaw-secrets.json` | `config/openclaw-config.template.json` | `~/.openclaw/openclaw.json` |
-| `openclaw-secrets.env` | `config/openclaw-env.template` | `~/.openclaw/.env` (chmod 600) |
-| `openclaw-auth-profiles.json` | `config/openclaw-auth-profiles.template.json` | `~/.openclaw/agents/main/agent/auth-profiles.json` (chmod 600) |
+| File | Template | Destination on instance |
+|------|----------|------------------------|
+| `openclaw-secrets.json` | `shared/config/openclaw-config.template.json` | `~/.openclaw/openclaw.json` |
+| `openclaw-secrets.env` | `shared/config/openclaw-env.template` | `~/.openclaw/.env` (chmod 600) |
+| `openclaw-auth-profiles.json` | `shared/config/openclaw-auth-profiles.template.json` | `~/.openclaw/agents/main/agent/auth-profiles.json` (chmod 600) |
 
 ### Workspace Files
 
@@ -213,12 +192,12 @@ Pre-populate the OpenClaw workspace with your identity and soul files. Supports 
 
 ```hcl
 workspace_files = {
-  "SOUL.md"                      = file("../../mac-mini-setup/openclaw-workspace/SOUL.md")
-  "USER.md"                      = file("../../mac-mini-setup/openclaw-workspace/USER.md")
-  "docs/openclaw-playbook.md"    = file("../../mac-mini-setup/openclaw-workspace/docs/openclaw-playbook.md")
-  "tools/browser.md"             = file("../../mac-mini-setup/openclaw-workspace/tools/browser.md")
-  "scripts/pre-commit-secrets.sh" = file("../../mac-mini-setup/openclaw-workspace/scripts/pre-commit-secrets.sh")
-  "bootstrap/README.md"          = file("../../mac-mini-setup/openclaw-workspace/bootstrap/README.md")
+  "SOUL.md"                      = file("../../shared/workspace/SOUL.md")
+  "USER.md"                      = file("../../shared/workspace/USER.md")
+  "docs/openclaw-playbook.md"    = file("../../shared/workspace/docs/openclaw-playbook.md")
+  "tools/browser.md"             = file("../../shared/workspace/tools/browser.md")
+  "scripts/pre-commit-secrets.sh" = file("../../shared/workspace/scripts/pre-commit-secrets.sh")
+  "bootstrap/README.md"          = file("../../shared/workspace/bootstrap/README.md")
 }
 ```
 
@@ -233,12 +212,12 @@ Deploy custom skill directories to `~/.openclaw/skills/`. Each skill is a map of
 ```hcl
 custom_skills = {
   "email" = {
-    "SKILL.md" = file("../../mac-mini-setup/openclaw-skills/email/SKILL.md")
+    "SKILL.md" = file("../../shared/skills/email/SKILL.md")
   }
   "clawdstrike" = {
-    "SKILL.md"                    = file("../../mac-mini-setup/openclaw-skills/clawdstrike/SKILL.md")
-    "references/threat-model.md"  = file("../../mac-mini-setup/openclaw-skills/clawdstrike/references/threat-model.md")
-    "scripts/collect_verified.sh" = file("../../mac-mini-setup/openclaw-skills/clawdstrike/scripts/collect_verified.sh")
+    "SKILL.md"                    = file("../../shared/skills/clawdstrike/SKILL.md")
+    "references/threat-model.md"  = file("../../shared/skills/clawdstrike/references/threat-model.md")
+    "scripts/collect_verified.sh" = file("../../shared/skills/clawdstrike/scripts/collect_verified.sh")
   }
 }
 ```
@@ -249,8 +228,8 @@ Write cron job JSON specs to `~/.openclaw/workspace/cron-jobs/`. After the insta
 
 ```hcl
 cron_jobs = {
-  "daily-digest"   = file("../../mac-mini-setup/cron-jobs/daily-digest.json")
-  "weekly-report"  = file("../../mac-mini-setup/cron-jobs/weekly-report.json")
+  "daily-digest"   = file("../../shared/cron-jobs/daily-digest.json")
+  "weekly-report"  = file("../../shared/cron-jobs/weekly-report.json")
 }
 ```
 
@@ -284,12 +263,12 @@ extra_packages = ["golang", "python3-pip", "chromium"]
 
 **Wizard secrets handling**: The setup wizard writes secrets only to `/tmp/` temp files and passes them via `-var` flags. Temp files are cleaned up after apply. No secrets are written to the repo directory.
 
-**Recommended approach**: Store your config files in `mac-mini-setup` and reference them with `file()`:
+**Recommended approach**: Store your secrets at the repo root and reference them with `file()`:
 ```hcl
-openclaw_config_json = file("../../mac-mini-setup/openclaw-secrets.json")
+openclaw_config_json = file("../openclaw-secrets.json")
 ```
 
-The secrets files (`openclaw-secrets.*`, `openclaw-auth-profiles.json`) are gitignored in mac-mini-setup and never committed to either repo.
+The secrets files (`openclaw-secrets.*`, `openclaw-auth-profiles.json`) are gitignored and never committed.
 
 ---
 

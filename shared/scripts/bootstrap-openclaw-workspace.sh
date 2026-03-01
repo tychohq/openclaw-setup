@@ -82,10 +82,10 @@ done
 echo ""
 echo ">>> Copying workspace files..."
 
-WORKSPACE_SRC="$REPO_DIR/openclaw-workspace"
+WORKSPACE_SRC="$REPO_DIR/workspace"
 
 if [ ! -d "$WORKSPACE_SRC" ]; then
-  skip "No openclaw-workspace/ directory in repo — skipping file copy"
+  skip "No workspace/ directory in repo — skipping file copy"
   skip "Create it with your AGENTS.md, SOUL.md, IDENTITY.md, etc."
 else
   # Copy root .md files (don't overwrite existing)
@@ -183,7 +183,7 @@ fi
 echo ""
 echo ">>> Checking custom skills..."
 
-CUSTOM_SKILLS_SRC="$REPO_DIR/openclaw-skills"
+CUSTOM_SKILLS_SRC="$REPO_DIR/skills"
 
 if [ -d "$CUSTOM_SKILLS_SRC" ]; then
   mkdir -p "$OPENCLAW_DIR/skills"
@@ -198,7 +198,7 @@ if [ -d "$CUSTOM_SKILLS_SRC" ]; then
     fi
   done
 else
-  skip "No openclaw-skills/ directory — skipping custom skills"
+  skip "No skills/ directory — skipping custom skills"
   skip "Create it with skill subdirectories (each with SKILL.md)"
 fi
 

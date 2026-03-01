@@ -26,8 +26,8 @@ OC_SKILLS_CUSTOM="$HOME/.agents/skills"
 OC_SKILLS_CLAWHUB="$HOME/.openclaw/skills"
 
 # Template paths
-TPL_WORKSPACE="$REPO_DIR/openclaw-workspace"
-TPL_SKILLS="$REPO_DIR/openclaw-skills"
+TPL_WORKSPACE="$REPO_DIR/workspace"
+TPL_SKILLS="$REPO_DIR/skills"
 TPL_CONFIG="$REPO_DIR/config/openclaw-config.template.json"
 
 # Colors
@@ -56,7 +56,7 @@ for arg in "$@"; do
     --help|-h)
       echo "Usage: $0 [--workspace-only] [--config-only] [--json]"
       echo ""
-      echo "Compare your OpenClaw install against the mac-mini-setup template."
+      echo "Compare your OpenClaw install against the openclaw-setup template."
       echo "  --workspace-only   Only compare workspace files"
       echo "  --config-only      Only compare openclaw.json config"
       echo "  --json             Output as JSON instead of human-readable"
@@ -74,7 +74,7 @@ fi
 
 if [ ! -d "$TPL_WORKSPACE" ]; then
   echo "Error: Template workspace not found at $TPL_WORKSPACE"
-  echo "Run this from the mac-mini-setup repo root, or clone it first."
+  echo "Run this from the openclaw-setup repo root, or clone it first."
   exit 1
 fi
 

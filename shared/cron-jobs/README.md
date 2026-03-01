@@ -7,7 +7,7 @@ Ready-to-use cron job definitions for OpenClaw. These are starter templates — 
 After OpenClaw is running, you can add these jobs via the OpenClaw API or by having your agent create them. The JSON files in this directory can be used as references.
 
 **Via your agent:**
-Ask your agent to "set up the starter cron jobs from the mac-mini-setup repo" and point it at these files.
+Ask your agent to "set up the starter cron jobs from the openclaw-setup repo" and point it at these files.
 
 **Via the cron tool:**
 Each `.json` file contains a job definition ready to pass to `cron add`.
@@ -31,4 +31,4 @@ Each `.json` file contains a job definition ready to pass to `cron add`.
 
 ## Adding Your Own
 
-See the `cron-setup` skill in `openclaw-skills/` for conventions and patterns.
+See the `cron-setup` skill in `../skills/` for conventions and patterns.

@@ -1,7 +1,7 @@
 # Setup Context
 
-This machine was set up using the mac-mini-setup script.
-Repo: ~/projects/mac-mini-setup
+This machine was set up using the openclaw-setup script.
+Repo: ~/projects/openclaw-setup
 
 ## What the script already did
 - Installed Xcode Command Line Tools
@@ -23,13 +23,13 @@ Repo: ~/projects/mac-mini-setup
 - OpenClaw config: `~/.openclaw/openclaw.json`
 - Environment vars: `~/.openclaw/.env`
 - Auth profiles: `~/.openclaw/agents/main/agent/auth-profiles.json`
-- Setup repo: `~/projects/mac-mini-setup/`
-- Setup config: `~/projects/mac-mini-setup/config.sh`
+- Setup repo: `~/projects/openclaw-setup/`
+- Setup config: `~/projects/openclaw-setup/config.sh`
 
 ## Checking what was installed
 Run from the setup repo:
 ```bash
-cd ~/projects/mac-mini-setup
+cd ~/projects/openclaw-setup
 ./setup.sh --dry-run    # Shows what's installed vs missing
 scripts/setup-openclaw.sh --check   # Verifies OpenClaw config
 ```

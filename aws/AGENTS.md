@@ -12,12 +12,12 @@
   - `cloud-init.sh.tftpl` — Cloud-init script (Terraform template)
   - `outputs.tf` — Output values
   - `terraform.tfvars.example` — Example tfvars (simple)
-  - `terraform.tfvars.advanced.example` — Full mac-mini-setup reference
+  - `terraform.tfvars.advanced.example` — Full advanced deployment reference
 - `docs/` — Setup guides and PRDs
   - `discord-bot-setup.md` — Discord bot creation, intents, permissions, channel restriction
   - `slack-bot-setup.md` — Slack app creation via agent-browser or manual setup
   - `PRD-checklist.md` — PRD for deployment health check system
-- `checklist/` — Deployment health check scripts
+- `../shared/checklist/` — Deployment health check scripts (shared across platforms)
   - `checklist.sh` — Main runner script
   - `checklist.conf.example` — Config template
   - `checks/` — Individual check modules

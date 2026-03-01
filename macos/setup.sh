@@ -13,6 +13,8 @@ set -euo pipefail
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+SHARED_DIR="$REPO_DIR/shared"
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
@@ -632,9 +634,9 @@ if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   OC_AUTH="${OPENCLAW_SECRETS_AUTH:-$REPO_DIR/openclaw-auth-profiles.json}"
 
   # Auto-create .env from template if it doesn't exist yet
-  if [ ! -f "$OC_ENV" ] && [ -f "$REPO_DIR/config/openclaw-env.template" ]; then
+  if [ ! -f "$OC_ENV" ] && [ -f "$SHARED_DIR/config/openclaw-env.template" ]; then
     echo ">>> Creating openclaw-secrets.env from template..."
-    cp "$REPO_DIR/config/openclaw-env.template" "$OC_ENV"
+    cp "$SHARED_DIR/config/openclaw-env.template" "$OC_ENV"
     record_installed "openclaw-secrets.env (from template — fill in your API keys)"
     echo "  ℹ️  Edit $OC_ENV with your API keys, then re-run setup or run:"
     echo "     scripts/setup-openclaw.sh --env $OC_ENV"
@@ -645,7 +647,7 @@ if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
     SETUP_ARGS=(--config "$OC_CONFIG")
     [ -f "$OC_ENV" ] && SETUP_ARGS+=(--env "$OC_ENV")
     [ -f "$OC_AUTH" ] && SETUP_ARGS+=(--auth-profiles "$OC_AUTH")
-    if "$SCRIPT_DIR/scripts/setup-openclaw.sh" "${SETUP_ARGS[@]}"; then
+    if "$SHARED_DIR/scripts/setup-openclaw.sh" "${SETUP_ARGS[@]}"; then
       record_installed "OpenClaw config"
     else
       record_failed "OpenClaw config" "setup-openclaw.sh failed"
@@ -657,9 +659,9 @@ if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   fi
 
   # Bootstrap workspace, skills, and cron
-  if [ -x "$SCRIPT_DIR/scripts/bootstrap-openclaw-workspace.sh" ]; then
+  if [ -x "$SHARED_DIR/scripts/bootstrap-openclaw-workspace.sh" ]; then
     echo ">>> Bootstrapping OpenClaw workspace..."
-    "$SCRIPT_DIR/scripts/bootstrap-openclaw-workspace.sh" || record_failed "OpenClaw workspace" "bootstrap failed"
+    "$SHARED_DIR/scripts/bootstrap-openclaw-workspace.sh" || record_failed "OpenClaw workspace" "bootstrap failed"
   fi
 fi
 

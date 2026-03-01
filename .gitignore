@@ -2,12 +2,22 @@
 .env*
 !.env.example
 
+# Secrets (filled-in config files at repo root)
+openclaw-secrets.*
+openclaw-auth-profiles.json
+
 # Terraform
 *.tfstate
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
 tfplan
+*.tfvars
+!*.tfvars.example
+!*.tfvars.advanced.example
+
+# Slack local state
+.slack-app-state.json
 
 # tldr
 .tldr/
