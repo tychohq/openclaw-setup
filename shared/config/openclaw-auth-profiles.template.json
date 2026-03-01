@@ -1,0 +1,22 @@
+{
+  "_comment": "OpenClaw agent auth profiles. These are the actual API keys/tokens for each provider profile. Fill in and save as openclaw-auth-profiles.json (gitignored). Placed at ~/.openclaw/agents/main/agent/auth-profiles.json",
+
+  "version": 1,
+  "profiles": {
+    "anthropic:default": {
+      "type": "api_key",
+      "provider": "anthropic",
+      "key": ""
+    },
+    "openai:default": {
+      "type": "api_key",
+      "provider": "openai",
+      "key": ""
+    },
+    "openrouter:default": {
+      "type": "api_key",
+      "provider": "openrouter",
+      "key": ""
+    }
+  }
+}

@@ -1,0 +1,396 @@
+#!/bin/bash
+set -e
+
+LOG=/var/log/openclaw-install.log
+exec > >(tee -a "$LOG") 2>&1
+
+echo "[$(date)] Starting OpenClaw cloud-init..."
+
+# ── System Update & Base Packages ─────────────────────────────────────────────
+
+dnf update -y
+
+# Install Node.js 22
+curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+dnf install -y nodejs git jq openssl zsh%{ if length(extra_packages) > 0 } ${join(" ", extra_packages)}%{ endif }
+
+echo "[$(date)] System packages installed."
+
+# ── Set Timezone ──────────────────────────────────────────────────────────────
+
+timedatectl set-timezone "${timezone}"
+
+# ── Create openclaw User (idempotent) ─────────────────────────────────────────
+
+id -u openclaw &>/dev/null || useradd -m -s /bin/zsh openclaw
+# Ensure zsh is the login shell even if user already exists
+usermod -s /bin/zsh openclaw
+
+# ── Install OpenClaw and Tools Globally ───────────────────────────────────────
+
+npm install -g openclaw clawhub agent-browser mcporter
+echo "[$(date)] OpenClaw and tools installed."
+
+# ── Install Claude Code (native installer) ────────────────────────────────────
+
+su - openclaw -c "curl -fsSL https://claude.ai/install.sh | bash" || \
+  npm install -g @anthropic-ai/claude-code  # fallback to npm if native fails
+echo "[$(date)] Claude Code installed."
+
+# ── Directory Structure ───────────────────────────────────────────────────────
+
+mkdir -p /home/openclaw/.openclaw/agents/main/agent
+mkdir -p /home/openclaw/.openclaw/workspace/docs
+mkdir -p /home/openclaw/.openclaw/workspace/tools
+mkdir -p /home/openclaw/.openclaw/workspace/memory/daily
+mkdir -p /home/openclaw/.openclaw/workspace/scripts
+mkdir -p /home/openclaw/.openclaw/skills
+mkdir -p /home/openclaw/.config/systemd/user
+
+%{ if has_config ~}
+# ── Write OpenClaw Config ─────────────────────────────────────────────────────
+
+echo "${openclaw_config_json_b64}" | base64 -d > /tmp/openclaw-raw.json
+
+# Clean empty string values — prevents RangeError crash in OpenClaw config redaction
+jq 'walk(if type == "object" then with_entries(select(.value != "")) else . end)' \
+  /tmp/openclaw-raw.json > /home/openclaw/.openclaw/openclaw.json
+rm -f /tmp/openclaw-raw.json
+echo "[$(date)] OpenClaw config written."
+
+%{ endif ~}
+%{ if openclaw_env_b64 != "" ~}
+# ── Write .env File ───────────────────────────────────────────────────────────
+
+echo "${openclaw_env_b64}" | base64 -d > /home/openclaw/.openclaw/.env
+
+# Generate gateway token if missing or empty
+if ! grep -q "^GATEWAY_AUTH_TOKEN=." /home/openclaw/.openclaw/.env; then
+  TOKEN="$(openssl rand -hex 24)"
+  if grep -q "^GATEWAY_AUTH_TOKEN=" /home/openclaw/.openclaw/.env; then
+    sed -i "s/^GATEWAY_AUTH_TOKEN=.*/GATEWAY_AUTH_TOKEN=$${TOKEN}/" /home/openclaw/.openclaw/.env
+  else
+    echo "GATEWAY_AUTH_TOKEN=$${TOKEN}" >> /home/openclaw/.openclaw/.env
+  fi
+fi
+chmod 600 /home/openclaw/.openclaw/.env
+echo "[$(date)] .env file written."
+
+# ── Configure Claude Code ──────────────────────────────────────────────────────
+# Supports both direct Anthropic API key and AWS Bedrock bearer token from .env
+
+mkdir -p /home/openclaw/.claude
+cat > /home/openclaw/.claude/settings.json << CLAUDEEOF
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)"
+    ],
+    "deny": []
+  }
+}
+CLAUDEEOF
+
+ANTHROPIC_KEY=$(grep "^ANTHROPIC_API_KEY=" /home/openclaw/.openclaw/.env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+BEDROCK_TOKEN=$(grep "^AWS_BEARER_TOKEN_BEDROCK=" /home/openclaw/.openclaw/.env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+
+for rcfile in /home/openclaw/.zshrc /home/openclaw/.bashrc; do
+  # Always add the cc alias
+  echo 'alias cc="claude --dangerously-skip-permissions"' >> "$rcfile"
+
+  if [ -n "$BEDROCK_TOKEN" ]; then
+    echo "export CLAUDE_CODE_USE_BEDROCK=1" >> "$rcfile"
+    echo "export AWS_BEARER_TOKEN_BEDROCK=$${BEDROCK_TOKEN}" >> "$rcfile"
+    echo "export AWS_REGION=${aws_region}" >> "$rcfile"
+  elif [ -n "$ANTHROPIC_KEY" ]; then
+    echo "export ANTHROPIC_API_KEY=$${ANTHROPIC_KEY}" >> "$rcfile"
+  fi
+done
+
+chown -R openclaw:openclaw /home/openclaw/.claude
+if [ -n "$BEDROCK_TOKEN" ]; then
+  echo "[$(date)] Claude Code configured with Bedrock bearer token + cc alias."
+elif [ -n "$ANTHROPIC_KEY" ]; then
+  echo "[$(date)] Claude Code configured with Anthropic API key + cc alias."
+else
+  echo "[$(date)] Claude Code installed (no API key found — configure manually)."
+fi
+
+# ── Patch Slack allowFrom from SLACK_OWNER_USER_ID in .env ────────────────────
+# If the .env has SLACK_OWNER_USER_ID and the config has a slack channel,
+# ensure dmPolicy=allowlist and allowFrom includes the owner.
+
+SLACK_OWNER_USER_ID=$(grep "^SLACK_OWNER_USER_ID=" /home/openclaw/.openclaw/.env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+if [ -n "$SLACK_OWNER_USER_ID" ] && [ -f /home/openclaw/.openclaw/openclaw.json ]; then
+  if jq -e '.channels.slack' /home/openclaw/.openclaw/openclaw.json >/dev/null 2>&1; then
+    jq --arg uid "$SLACK_OWNER_USER_ID" '
+      .channels.slack.dmPolicy = "allowlist" |
+      .channels.slack.groupPolicy = "allowlist" |
+      .channels.slack.allowFrom = (
+        (.channels.slack.allowFrom // []) |
+        if index($uid) then . else . + [$uid] end
+      )
+    ' /home/openclaw/.openclaw/openclaw.json > /tmp/openclaw-patched.json && \
+    mv /tmp/openclaw-patched.json /home/openclaw/.openclaw/openclaw.json
+    echo "[$(date)] Slack allowFrom patched with owner $SLACK_OWNER_USER_ID"
+  fi
+fi
+
+%{ endif ~}
+%{ if openclaw_auth_profiles_json_b64 != "" ~}
+# ── Write Auth Profiles ───────────────────────────────────────────────────────
+
+echo "${openclaw_auth_profiles_json_b64}" | base64 -d \
+  > /home/openclaw/.openclaw/agents/main/agent/auth-profiles.json
+chmod 600 /home/openclaw/.openclaw/agents/main/agent/auth-profiles.json
+echo "[$(date)] Auth profiles written."
+
+%{ endif ~}
+%{ if length(workspace_files_b64) > 0 ~}
+# ── Write Workspace Files ─────────────────────────────────────────────────────
+
+%{ for filepath, content_b64 in workspace_files_b64 ~}
+mkdir -p "/home/openclaw/.openclaw/workspace/${dirname(filepath)}"
+echo "${content_b64}" | base64 -d > "/home/openclaw/.openclaw/workspace/${filepath}"
+%{ endfor ~}
+echo "[$(date)] Workspace files written."
+
+%{ endif ~}
+%{ if length(custom_skills_b64) > 0 ~}
+# ── Write Custom Skills ───────────────────────────────────────────────────────
+
+%{ for skill_name, skill_files in custom_skills_b64 ~}
+mkdir -p "/home/openclaw/.openclaw/skills/${skill_name}"
+%{ for filepath, content_b64 in skill_files ~}
+mkdir -p "/home/openclaw/.openclaw/skills/${skill_name}/${dirname(filepath)}"
+echo "${content_b64}" | base64 -d > "/home/openclaw/.openclaw/skills/${skill_name}/${filepath}"
+%{ endfor ~}
+%{ endfor ~}
+echo "[$(date)] Custom skills written."
+
+%{ endif ~}
+%{ if length(cron_jobs_b64) > 0 ~}
+# ── Write Cron Job Files ──────────────────────────────────────────────────────
+
+mkdir -p /home/openclaw/.openclaw/workspace/cron-jobs
+
+%{ for job_name, content_b64 in cron_jobs_b64 ~}
+echo "${content_b64}" | base64 -d > "/home/openclaw/.openclaw/workspace/cron-jobs/${job_name}.json"
+%{ endfor ~}
+echo "[$(date)] Cron job files written."
+echo "  NOTE: To register cron jobs, ask OpenClaw to register the files in ~/.openclaw/workspace/cron-jobs/"
+
+%{ endif ~}
+%{ if enable_first_boot ~}
+# ── First-Boot Onboarding ─────────────────────────────────────────────────────
+# Creates the trigger file and seeds AGENTS.md with first-boot awareness.
+# The first-boot skill at ~/.openclaw/skills/first-boot/ handles the conversation.
+
+touch /home/openclaw/.openclaw/workspace/.first-boot
+
+# Deploy the first-boot skill
+mkdir -p /home/openclaw/.openclaw/skills/first-boot
+echo "${first_boot_skill_b64}" | base64 -d > /home/openclaw/.openclaw/skills/first-boot/SKILL.md
+echo "[$(date)] First-boot flag and skill deployed — onboarding will run on first interaction."
+
+# Seed AGENTS.md with first-boot check (prepend to any existing content)
+EXISTING_AGENTS=""
+[ -f /home/openclaw/.openclaw/workspace/AGENTS.md ] && EXISTING_AGENTS=$(cat /home/openclaw/.openclaw/workspace/AGENTS.md)
+
+cat > /home/openclaw/.openclaw/workspace/AGENTS.md << 'AGENTSEOF'
+# AGENTS.md
+
+## First Boot Check
+On every message, check if `~/.openclaw/workspace/.first-boot` exists.
+If it does, read the `first-boot` skill (at ~/.openclaw/skills/first-boot/SKILL.md) and follow its onboarding flow.
+Do NOT do anything else until onboarding is complete (the file is deleted).
+
+## Normal Operation
+Once `.first-boot` is gone, operate normally as a helpful AI assistant.
+AGENTSEOF
+
+if [ -n "$EXISTING_AGENTS" ]; then
+  echo "" >> /home/openclaw/.openclaw/workspace/AGENTS.md
+  echo "$EXISTING_AGENTS" >> /home/openclaw/.openclaw/workspace/AGENTS.md
+fi
+
+%{ endif ~}
+%{ if assistant_name != "OpenClaw" && !enable_first_boot ~}
+# ── Write IDENTITY.md from assistant_name ─────────────────────────────────────
+
+cat > /home/openclaw/.openclaw/workspace/IDENTITY.md << 'IDENTITYMD'
+# Identity
+
+Name: ${assistant_name}
+IDENTITYMD
+
+%{ endif ~}
+%{ if owner_name != "" && !has_config ~}
+# ── Write USER.md from owner_name ─────────────────────────────────────────────
+
+cat > /home/openclaw/.openclaw/workspace/USER.md << 'USERMD'
+# User
+
+Name: ${owner_name}
+USERMD
+
+%{ endif ~}
+%{ if deploy_checklist ~}
+# ── Deploy Health Checklist (cloned from repo) ────────────────────────────────
+
+CHECKLIST_DEST="/home/openclaw/.openclaw/workspace/scripts/checklist"
+mkdir -p "$CHECKLIST_DEST"
+
+# Clone only the checklist directory from the repo (sparse checkout)
+REPO_TMP=$(mktemp -d)
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/tychohq/openclaw-terraform-aws.git "$REPO_TMP" 2>/dev/null || \
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/janobarnard/openclaw-aws.git "$REPO_TMP" 2>/dev/null || true
+
+if [ -d "$REPO_TMP/.git" ]; then
+  cd "$REPO_TMP"
+  git sparse-checkout set checklist
+  cp -r checklist/* "$CHECKLIST_DEST/"
+  cd /
+  rm -rf "$REPO_TMP"
+fi
+
+chmod +x "$CHECKLIST_DEST/checklist.sh" "$CHECKLIST_DEST/lib.sh" 2>/dev/null || true
+find "$CHECKLIST_DEST/checks" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+
+%{ if length(checklist_checks) > 0 ~}
+# Generate checklist.conf from terraform checklist_checks variable
+cat > "$CHECKLIST_DEST/checklist.conf" << 'CHECKLISTCONFEOF'
+# Generated by Terraform — edit to customize
+# true = run this check, false = skip it
+%{ for check, enabled in checklist_checks ~}
+CHECK_${upper(check)}=${enabled ? "true" : "false"}
+%{ endfor ~}
+CHECKLISTCONFEOF
+%{ endif ~}
+
+echo "[$(date)] Health checklist deployed to $CHECKLIST_DEST"
+
+%{ endif ~}
+%{ if google_oauth_credentials_json_b64 != "" ~}
+# ── Install & Configure GOG CLI (Google OAuth) ──────────────────────────────
+
+# Download GOG CLI binary from GitHub releases
+ARCH=$(uname -m)
+if [ "$ARCH" = "aarch64" ]; then
+  GOG_ARCH="arm64"
+elif [ "$ARCH" = "x86_64" ]; then
+  GOG_ARCH="amd64"
+else
+  echo "[WARN] Unsupported architecture for GOG CLI: $ARCH"
+  GOG_ARCH=""
+fi
+
+if [ -n "$GOG_ARCH" ]; then
+  GOG_VERSION="0.11.0"
+  curl -fsSL "https://github.com/steipete/gogcli/releases/download/v$${GOG_VERSION}/gogcli_$${GOG_VERSION}_linux_$${GOG_ARCH}.tar.gz" | tar xz -C /usr/local/bin gog
+  chmod +x /usr/local/bin/gog
+  echo "[$(date)] GOG CLI v$${GOG_VERSION} installed."
+fi
+
+# Configure file keyring backend (required for headless Linux)
+su - openclaw -c "gog auth keyring file"
+
+# Generate keyring password and append to .env
+GOG_KEYRING_PW="$(openssl rand -hex 16)"
+echo "GOG_KEYRING_PASSWORD=$GOG_KEYRING_PW" >> /home/openclaw/.openclaw/.env
+
+# Set OAuth credentials using the keyring password
+echo "${google_oauth_credentials_json_b64}" | base64 -d > /tmp/gog-credentials.json
+su - openclaw -c "GOG_KEYRING_PASSWORD=$GOG_KEYRING_PW gog auth credentials set /tmp/gog-credentials.json"
+rm -f /tmp/gog-credentials.json
+echo "[$(date)] GOG CLI credentials configured with file keyring."
+
+%{ endif ~}
+# ── Set Ownership (before git init — npm install runs as root) ────────────────
+
+chown -R openclaw:openclaw /home/openclaw
+chown -R openclaw:openclaw /home/openclaw/.config
+
+# ── Initialize .openclaw as Git Repo ─────────────────────────────────────────
+
+if [ ! -d /home/openclaw/.openclaw/.git ]; then
+  su - openclaw -c 'git config --global user.email "openclaw@localhost" && git config --global user.name "OpenClaw" && cd ~/.openclaw && git init && git add -A && git commit -m "Initial workspace"'
+fi
+
+# Install pre-commit hook if the script exists
+if [ -f /home/openclaw/.openclaw/workspace/scripts/pre-commit-secrets.sh ]; then
+  cp /home/openclaw/.openclaw/workspace/scripts/pre-commit-secrets.sh \
+    /home/openclaw/.openclaw/.git/hooks/pre-commit
+  chmod +x /home/openclaw/.openclaw/.git/hooks/pre-commit
+  echo "[$(date)] Pre-commit hook installed."
+fi
+
+# ── systemd User Service ──────────────────────────────────────────────────────
+
+# Enable linger so the user service starts at boot (no login required)
+loginctl enable-linger openclaw
+
+cat > /home/openclaw/.config/systemd/user/openclaw-gateway.service << 'SERVICE'
+[Unit]
+Description=OpenClaw Gateway
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart=/usr/bin/openclaw gateway
+Restart=always
+RestartSec=10
+%{ if openclaw_env_b64 != "" ~}
+EnvironmentFile=%h/.openclaw/.env
+%{ endif ~}
+
+[Install]
+WantedBy=default.target
+SERVICE
+
+chown -R openclaw:openclaw /home/openclaw/.config
+
+# Set up runtime directory for systemd --user in this boot session
+OPENCLAW_UID="$(id -u openclaw)"
+mkdir -p "/run/user/$${OPENCLAW_UID}"
+chown openclaw:openclaw "/run/user/$${OPENCLAW_UID}"
+chmod 700 "/run/user/$${OPENCLAW_UID}"
+
+su - openclaw -c "XDG_RUNTIME_DIR=/run/user/$${OPENCLAW_UID} systemctl --user daemon-reload"
+su - openclaw -c "XDG_RUNTIME_DIR=/run/user/$${OPENCLAW_UID} systemctl --user enable openclaw-gateway"
+echo "[$(date)] systemd user service enabled."
+
+%{ if length(clawhub_skills) > 0 ~}
+# ── Install clawhub Skills ────────────────────────────────────────────────────
+
+%{ for skill in clawhub_skills ~}
+su - openclaw -c "clawhub install ${skill}" || echo "[WARN] Failed to install skill: ${skill}"
+%{ endfor ~}
+echo "[$(date)] clawhub skills installed."
+
+%{ endif ~}
+%{ if has_config ~}
+# ── Start Gateway ─────────────────────────────────────────────────────────────
+
+su - openclaw -c "XDG_RUNTIME_DIR=/run/user/$${OPENCLAW_UID} systemctl --user start openclaw-gateway"
+echo "[$(date)] OpenClaw gateway started."
+echo ""
+echo "OpenClaw is running! View logs:"
+echo "  sudo -u openclaw journalctl --user -u openclaw-gateway -f"
+
+%{ else ~}
+# ── Manual Onboard Prompt ─────────────────────────────────────────────────────
+
+echo ""
+echo "Ready! Connect via SSM and run:"
+echo "  sudo -u openclaw openclaw onboard --install-daemon"
+
+%{ endif ~}
+
+echo "[$(date)] OpenClaw cloud-init complete!"

@@ -1,0 +1,20 @@
+{
+  "name": "daily-workspace-commit",
+  "description": "Daily git commit of workspace changes for backup and history tracking.",
+  "enabled": true,
+  "schedule": {
+    "kind": "cron",
+    "expr": "0 4 * * *",
+    "tz": "America/New_York"
+  },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "Run the daily git commit for ~/.openclaw. Follow these steps:\n\n1. cd ~/.openclaw\n2. Run 'git status --porcelain' to see all changed files\n3. If there are no changes, reply with just: SKIP\n4. If there ARE changes:\n\n   a. Stage all changes: git add -A\n\n   b. Run 'git diff --cached' to see the ACTUAL content changes (not just file names)\n\n   c. Create a commit with a descriptive message:\n      ```bash\n      cd ~/.openclaw && git commit -m \"chore(daily): <date> - <1-line summary>\"\n      ```\n\n      Commit message guidelines:\n      - ONLY include structural config changes: new/removed cron jobs, new config keys, new agents, new channel configs, etc.\n      - Do NOT mention value-only updates like lastRunAtMs, nextRunAtMs, lastStatus, lastDurationMs, offsets, updatedAtMs, state changes, or other runtime counters.\n      - Be SPECIFIC about what changed, not generic. Read the diffs to understand the actual content.\n\n   d. The pre-commit hook will block if secrets are detected. If it blocks, report the issue.\n\n   IMPORTANT: This is local-only, do NOT push anywhere.",
+    "model": "anthropic/claude-sonnet-4-20250514",
+    "timeoutSeconds": 120
+  },
+  "delivery": {
+    "mode": "none"
+  }
+}

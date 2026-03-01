@@ -1,0 +1,285 @@
+{
+  "_comment": "OpenClaw configuration template. Fill in your values and save as openclaw-secrets.json (gitignored). The setup script will merge this into ~/.openclaw/openclaw.json",
+  "_warning": "IMPORTANT: Remove any env.vars or token fields you leave empty before applying. Empty string values ('') cause a RangeError crash in openclaw's config redaction. The setup script strips these automatically.",
+  "env": {
+    "vars": {
+      "OPENAI_API_KEY": "",
+      "ANTHROPIC_API_KEY": "",
+      "OPENROUTER_API_KEY": "",
+      "GEMINI_API_KEY": "",
+      "BRAVE_API_KEY": ""
+    }
+  },
+  "auth": {
+    "profiles": {
+      "anthropic:default": {
+        "provider": "anthropic",
+        "mode": "api_key"
+      },
+      "openai:default": {
+        "provider": "openai",
+        "mode": "api_key"
+      }
+    },
+    "order": {
+      "anthropic": [
+        "anthropic:default"
+      ],
+      "openai": [
+        "openai:default"
+      ]
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "anthropic": {
+        "baseUrl": "https://api.anthropic.com",
+        "apiKey": "ANTHROPIC_API_KEY",
+        "api": "anthropic-messages",
+        "models": [
+          {
+            "id": "claude-opus-4-6",
+            "name": "Claude Opus 4.6",
+            "reasoning": false,
+            "input": [
+              "text",
+              "image"
+            ],
+            "cost": {
+              "input": 15,
+              "output": 75,
+              "cacheRead": 1.5,
+              "cacheWrite": 18.75
+            },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "claude-sonnet-4-5-20250514",
+            "name": "Claude Sonnet 4",
+            "reasoning": false,
+            "input": [
+              "text",
+              "image"
+            ],
+            "cost": {
+              "input": 3,
+              "output": 15,
+              "cacheRead": 0.3,
+              "cacheWrite": 3.75
+            },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-opus-4-6",
+        "fallbacks": [
+          "anthropic/claude-sonnet-4-5"
+        ]
+      },
+      "models": {
+        "anthropic/claude-opus-4-6": {
+          "alias": "opus"
+        },
+        "anthropic/claude-sonnet-4-5": {
+          "alias": "sonnet"
+        }
+      },
+      "memorySearch": {
+        "sources": [
+          "memory",
+          "sessions"
+        ],
+        "extraPaths": ["."],
+        "experimental": {
+          "sessionMemory": true
+        },
+        "provider": "gemini",
+        "fallback": "none"
+      },
+      "contextPruning": {
+        "mode": "off",
+        "ttl": "1h"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "heartbeat": {
+        "every": "1h"
+      },
+      "verboseDefault": "on",
+      "blockStreamingDefault": "on",
+      "maxConcurrent": 6,
+      "subagents": {
+        "maxConcurrent": 8
+      }
+    }
+  },
+  "channels": {
+    "_comment_discord": "Get token from https://discord.com/developers/applications",
+    "discord": {
+      "enabled": true,
+      "token": "${DISCORD_TOKEN}",
+      "groupPolicy": "allowlist",
+      "dmPolicy": "pairing",
+      "requireMention": false,
+      "allowFrom": [
+        "YOUR_DISCORD_USER_ID"
+      ],
+      "guilds": {
+        "YOUR_GUILD_ID": {
+          "requireMention": false
+        }
+      }
+    },
+    "_comment_telegram": "Get bot token from @BotFather on Telegram",
+    "telegram": {
+      "enabled": false,
+      "botToken": "",
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "allowFrom": [],
+      "groups": {}
+    },
+    "_comment_slack": "See scripts/create-slack-bot.sh or set up manually",
+    "slack": {
+      "enabled": false,
+      "mode": "socket",
+      "appToken": "",
+      "botToken": "",
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "allowFrom": [],
+      "channels": {}
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  },
+
+  "discovery": {
+    "wideArea": { "enabled": false },
+    "mdns": { "mode": "minimal" }
+  },
+
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": ""
+    },
+    "tailscale": {
+      "mode": "off"
+    }
+  },
+  "memory": {
+    "backend": "builtin",
+    "qmd": {
+      "includeDefaultMemory": true,
+      "paths": [
+        {
+          "path": ".",
+          "name": "workspace",
+          "pattern": "**/*.md"
+        }
+      ],
+      "update": {
+        "interval": "5m"
+      }
+    }
+  },
+  "skills": {
+    "load": {
+      "extraDirs": ["~/.agents/skills"]
+    },
+    "install": {
+      "nodeManager": "bun"
+    },
+    "allowBundled": [
+      "discord",
+      "gemini",
+      "github",
+      "mcporter",
+      "nano-banana-pro",
+      "openai-whisper-api",
+      "session-logs",
+      "skill-creator",
+      "tmux",
+      "gog",
+      "goplaces",
+      "healthcheck",
+      "nano-pdf",
+      "openai-image-gen",
+      "slack"
+    ],
+    "entries": {
+      "brave-search": { "apiKey": "" },
+      "goplaces": { "apiKey": "" },
+      "nano-banana-pro": { "apiKey": "" }
+    }
+  },
+  "plugins": {
+    "allow": [
+      "device-pair",
+      "memory-core",
+      "discord",
+      "telegram",
+      "slack"
+    ],
+    "entries": {
+      "discord": {
+        "enabled": true
+      },
+      "telegram": {
+        "enabled": false
+      },
+      "slack": {
+        "enabled": false
+      }
+    }
+  },
+  "browser": {
+    "headless": true
+  },
+
+  "messages": {
+    "queue": {
+      "mode": "steer+backlog"
+    },
+    "ackReactionScope": "group-mentions"
+  },
+
+  "hooks": {
+    "internal": {
+      "enabled": true,
+      "entries": {
+        "session-memory": {
+          "enabled": true
+        }
+      }
+    }
+  },
+
+  "tools": {
+    "sessions": {
+      "visibility": "all"
+    }
+  },
+
+  "session": {
+    "reset": {
+      "mode": "idle",
+      "idleMinutes": 525600
+    }
+  }
+}

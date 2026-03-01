@@ -1,0 +1,20 @@
+# Environment files (keep examples)
+.env*
+!.env.example
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+# tldr
+.tldr/
+.tldrignore
+
+# OS
+.DS_Store
+
+# Checklist local config (keep example)
+shared/checklist/checklist.conf

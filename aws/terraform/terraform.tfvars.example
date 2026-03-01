@@ -1,0 +1,42 @@
+# Simple deployment — fill in the basics, deploy, done.
+# For advanced config with workspace files and skills, see terraform.tfvars.advanced.example
+
+aws_region      = "us-east-1"
+deployment_name = "my-openclaw"
+owner_name      = "Your Name"
+timezone        = "America/New_York"
+
+# ── Minimal config — just API key + channel ──────────────────────────────────
+# Generate your own gateway token: openssl rand -hex 24
+
+openclaw_config_json = jsonencode({
+  gateway = {
+    auth = { token = "YOUR_GATEWAY_TOKEN" }
+    port = 18789
+  }
+  channels = {
+    discord = {
+      enabled     = true
+      token       = "YOUR_DISCORD_BOT_TOKEN"
+      groupPolicy = "allowlist"
+      dmPolicy    = "allowlist"
+      allowFrom   = ["YOUR_DISCORD_USER_ID"]
+      guilds = {
+        "YOUR_GUILD_ID" = {
+          requireMention = false
+        }
+      }
+    }
+  }
+})
+
+openclaw_env = <<-EOT
+  ANTHROPIC_API_KEY=sk-ant-...
+  GATEWAY_AUTH_TOKEN=YOUR_GATEWAY_TOKEN
+EOT
+
+# ── Google Workspace (GOG CLI) ───────────────────────────────
+# Download credentials.json from Google Cloud Console:
+#   console.cloud.google.com → APIs & Services → Credentials → OAuth 2.0 Client
+# After deploy, each user authorizes via: gog auth add user@domain.com --remote --readonly
+# google_oauth_credentials_json = file("path/to/google-credentials.json")

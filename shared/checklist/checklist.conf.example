@@ -1,0 +1,56 @@
+# OpenClaw Deployment Health Check Configuration
+# Copy to checklist.conf and enable the checks you want.
+# true = run this check, false = skip it
+
+# ── Core (recommended: always on) ──
+CHECK_GATEWAY=true
+CHECK_NODE=true
+CHECK_DISK=true
+
+# ── Channels (enable what you use) ──
+CHECK_DISCORD=false
+CHECK_SLACK=false
+# CHECK_TELEGRAM=false    # not yet implemented
+
+# ── Integrations ──
+CHECK_GOOGLE=true
+CHECK_GITHUB=false
+# CHECK_1PASSWORD=false   # not yet implemented
+
+# ── AI Features ──
+CHECK_IMAGE_GEN=true
+CHECK_SPEECH_TO_TEXT=true
+
+# ── Memory & Workspace ──
+CHECK_MEMORY=true
+
+# ── Skills ──
+CHECK_SKILLS=true
+
+# ── CLI Versions ──
+CHECK_CLI_VERSIONS=true
+
+# ── Cron ──
+CHECK_CRON=true
+
+# ── Context & Session Settings ──
+# Informational only — displays model, context pruning, compaction settings.
+CHECK_CONTEXT=true
+
+# ── Credential Storage ──
+# Recommended: always on — catches tools using OS keyring instead of file-based auth.
+# OS keyring (macOS Keychain, gnome-keyring) breaks on headless EC2 and requires
+# manual re-auth after CLI updates. File-based credentials in ~/.openclaw/.env
+# survive updates without prompts.
+CHECK_KEYRING=true
+
+# ── npm Command ──
+# Override if your system has an npm wrapper (e.g. /opt/homebrew/bin/npm redirects to bun).
+# Run `which npm` to check. If it's a wrapper, set this to the real npm binary.
+# Common values: npm  |  npm-real  |  /usr/local/bin/npm
+NPM_CMD=npm
+
+# ── Google Integration Settings (used by CHECK_GOOGLE) ──
+# Set to a Google account email to run per-account service tests.
+# Leave empty to only check gog install + auth status.
+# GOOGLE_ACCOUNT=you@gmail.com

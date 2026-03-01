@@ -1,0 +1,20 @@
+{
+  "name": "error-log-digest",
+  "description": "Daily review of gateway error logs. Diagnoses issues and proposes fixes.",
+  "enabled": true,
+  "schedule": {
+    "kind": "cron",
+    "expr": "0 8 * * *",
+    "tz": "America/New_York"
+  },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "You are an operational health analyst for the OpenClaw gateway. Your job is to review new errors from the logs, diagnose them, and propose fixes.\n\n## Step 1: Collect errors\n\nRun the error digest script:\n```bash\nbash ~/.openclaw/workspace/scripts/error-digest.sh\n```\n\n## Step 2: If NO_NEW_ERRORS, reply: SKIP\n\n## Step 3: Analyze and report\n\nIf there ARE errors, send a structured analysis via the message tool to your configured channel.\n\nFormat your post as:\n\n🔍 **Error Log Digest** — DAY Mon DD\n\n**Errors found:** X unique\n\nFor each distinct error pattern:\n- **What:** Brief description of the error\n- **Count/frequency:** How often it appeared\n- **Severity:** 🔴 critical / 🟡 warning / 🟢 minor\n- **Likely cause:** Your best diagnosis\n- **Fix:** Concrete action to resolve it (command, config change, code fix)\n\nGroup similar errors together. Don't list every instance — summarize patterns.\n\nIf you're confident a fix is safe and reversible (e.g., config tweak, restarting a service), say so explicitly — but do NOT apply fixes automatically. Just propose them.\n\nKeep it concise and scannable. No walls of text.",
+    "model": "anthropic/claude-sonnet-4-20250514",
+    "timeoutSeconds": 120
+  },
+  "delivery": {
+    "mode": "none"
+  }
+}

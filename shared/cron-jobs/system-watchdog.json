@@ -1,0 +1,20 @@
+{
+  "name": "system-watchdog",
+  "description": "Nightly system resource check at 4 AM. Runs check.sh, alerts only when something needs attention.",
+  "enabled": true,
+  "schedule": {
+    "kind": "cron",
+    "expr": "0 4 * * *",
+    "tz": "America/New_York"
+  },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "You are a system watchdog agent. Follow these steps exactly:\n\n1. Read the skill doc:\n   Read file: ~/.openclaw/skills/system-watchdog/SKILL.md\n\n2. Run the check script:\n   Execute: bash ~/.openclaw/skills/system-watchdog/check.sh\n\n3. Parse the JSON output. Look at the 'suspicious' field.\n\n4. If suspicious is FALSE: Reply with just SKIP — do NOT send any message.\n\n5. If suspicious is TRUE: Format a concise report and send it via the message tool.\n   Use your configured channel and target.\n\n   Report format:\n   ⚠️ System Watchdog Report (DATE)\n\n   📊 System: RAM X/Y GB (Z%) | Swap X/Y GB (Z%) | Load X/Y/Z\n   💾 Disk: / X% (Y/Z GB)\n\n   🔴 Issues Found:\n\n   For each issue, list:\n   TYPE — process_name (PID XXXX)\n     CPU: X% | RAM: XXXX MB (X%) | Running: X days\n     → Brief recommendation\n\n   Group similar processes (e.g. '7x claude processes running 24 days' instead of listing each).\n\n   💡 Suggested kills: kill PID1 PID2 PID3\n\n   Keep it brief and scannable. No walls of text.",
+    "model": "anthropic/claude-sonnet-4-20250514",
+    "timeoutSeconds": 120
+  },
+  "delivery": {
+    "mode": "none"
+  }
+}
