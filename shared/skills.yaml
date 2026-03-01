@@ -1,0 +1,41 @@
+# Skills manifest for OpenClaw deployments
+# Setup scripts install these via ClawHub during provisioning
+#
+# source: clawhub | local
+# slug: ClawHub package slug (for clawhub source)
+# path: relative path in this repo (for local source)
+
+skills:
+  - name: answeroverflow
+    source: clawhub
+    slug: answeroverflow-1-0-2
+
+  - name: clawdstrike
+    source: local
+    path: shared/skills/clawdstrike
+    note: Not yet published to ClawHub
+
+  - name: cron-setup
+    source: clawhub
+    slug: cron-setup
+
+  - name: doc-layers
+    source: local
+    path: shared/skills/doc-layers
+    note: Not yet published to ClawHub
+
+  - name: email
+    source: clawhub
+    slug: imap-smtp-email
+
+  - name: gog
+    source: clawhub
+    slug: gog
+
+  - name: self-reflection
+    source: clawhub
+    slug: self-reflection
+
+  - name: system-watchdog
+    source: clawhub
+    slug: system-watchdog
