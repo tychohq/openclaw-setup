@@ -1,0 +1,11 @@
+id: discord-channel
+description: "Discord plugin + channel settings (allowlist, no streaming, DM pairing, thread bindings). Requires DISCORD_TOKEN."
+targets: ["*"]
+created: 2026-03-01T22:05:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/discord-channel.json
+
+  - type: exec
+    command: jq '.plugins.allow=((.plugins.allow//[])+["discord"]|unique)' $HOME/.openclaw/openclaw.json > /tmp/_oc_patch.json && mv /tmp/_oc_patch.json $HOME/.openclaw/openclaw.json

@@ -1,0 +1,21 @@
+{
+  "plugins": {
+    "entries": {
+      "discord": {
+        "enabled": true
+      }
+    }
+  },
+  "channels": {
+    "discord": {
+      "enabled": true,
+      "groupPolicy": "allowlist",
+      "streaming": "off",
+      "dmPolicy": "pairing",
+      "threadBindings": {
+        "enabled": true,
+        "spawnAcpSessions": true
+      }
+    }
+  }
+}

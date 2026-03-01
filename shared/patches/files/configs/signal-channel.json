@@ -1,0 +1,9 @@
+{
+  "channels": {
+    "signal": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist"
+    }
+  }
+}
