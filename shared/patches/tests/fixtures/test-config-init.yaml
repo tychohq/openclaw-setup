@@ -1,0 +1,8 @@
+id: test-config-init
+description: "Test config_patch init from zero"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/test-base-config.json

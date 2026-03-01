@@ -1,0 +1,8 @@
+{
+  "name": "test-cron-job",
+  "schedule": { "kind": "cron", "expr": "0 9 * * *", "tz": "America/New_York" },
+  "payload": { "kind": "agentTurn", "message": "Test cron", "timeoutSeconds": 60 },
+  "sessionTarget": "isolated",
+  "delivery": { "mode": "announce" },
+  "enabled": true
+}
