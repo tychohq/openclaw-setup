@@ -1,0 +1,9 @@
+id: test-config-set
+description: "Test config_set step"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: config_set
+    path: models.default
+    value: "anthropic/claude-sonnet-4-20250514"

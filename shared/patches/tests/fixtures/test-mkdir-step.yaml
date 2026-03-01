@@ -1,0 +1,10 @@
+id: test-mkdir-step
+description: "Test mkdir step"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: mkdir
+    paths:
+      - ~/.openclaw/workspace/memory/daily
+      - ~/.openclaw/workspace/research

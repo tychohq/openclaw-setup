@@ -18,6 +18,7 @@ TOTAL=0
 setup() {
   TEST_HOME="$(mktemp -d)"
   TEST_PATCHES="$(mktemp -d)"
+  MOCK_BIN="$(mktemp -d)"
 
   # Copy fixture files/skills into the test patches dir
   mkdir -p "$TEST_PATCHES/patches" "$TEST_PATCHES/files" "$TEST_PATCHES/skills"
@@ -28,8 +29,22 @@ setup() {
   export OPENCLAW_PATCHES_DIR="$TEST_PATCHES"
 }
 
+# Create a mock openclaw binary that logs calls to a file
+setup_mock_openclaw() {
+  cat > "$MOCK_BIN/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+echo "$@" >> "${OPENCLAW_HOME}/mock-openclaw-calls.txt"
+# For cron list --json, return empty array
+if [[ "$1" == "cron" && "$2" == "list" && "$*" == *"--json"* ]]; then
+  echo "[]"
+fi
+MOCK
+  chmod +x "$MOCK_BIN/openclaw"
+  export PATH="$MOCK_BIN:$PATH"
+}
+
 teardown() {
-  rm -rf "$TEST_HOME" "$TEST_PATCHES"
+  rm -rf "$TEST_HOME" "$TEST_PATCHES" "$MOCK_BIN"
   unset OPENCLAW_HOME OPENCLAW_PATCHES_DIR
 }
 
@@ -100,6 +115,25 @@ test_config_patch_missing_config() {
   output="$(apply test-instance 2>&1)" || true
   echo "$output" | grep -q "openclaw onboard"
   [[ ! -f "$TEST_HOME/openclaw.json" ]]
+  teardown
+}
+
+test_config_set() {
+  setup
+  setup_mock_openclaw
+  load_patch test-config-set.yaml
+  apply test-instance >/dev/null
+  # Verify openclaw config set was called with the right args
+  grep -q "config set models.default anthropic/claude-sonnet-4-20250514" "$TEST_HOME/mock-openclaw-calls.txt"
+  teardown
+}
+
+test_mkdir_step() {
+  setup
+  load_patch test-mkdir-step.yaml
+  apply test-instance >/dev/null
+  [[ -d "$TEST_HOME/workspace/memory/daily" ]]
+  [[ -d "$TEST_HOME/workspace/research" ]]
   teardown
 }
 
@@ -249,6 +283,8 @@ run_test "file step (content_file)"       test_file_step_content_file
 run_test "file step (inline content)"     test_file_step_inline
 run_test "config_patch (existing config)" test_config_patch_existing
 run_test "config_patch (missing config)"  test_config_patch_missing_config
+run_test "config_set"                     test_config_set
+run_test "mkdir step"                     test_mkdir_step
 run_test "skill step"                     test_skill_step
 run_test "cron step"                      test_cron_step
 run_test "exec step"                      test_exec_step

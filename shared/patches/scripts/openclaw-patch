@@ -18,7 +18,7 @@ set -euo pipefail
 #   OPENCLAW_PATCHES_DIR   Override the repo root (default: auto-detect)
 #   OPENCLAW_HOME          Override OpenClaw home (default: ~/.openclaw)
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 # ── Resolve Paths ─────────────────────────────────────────────────────────────
 
@@ -131,15 +131,17 @@ exec_step() {
   step_type="$(yaml_get "$step_file" "type")"
   
   case "$step_type" in
-    file)           exec_step_file "$step_file" ;;
-    config_patch)   exec_step_config_patch "$step_file" ;;
-    skill)          exec_step_skill "$step_file" ;;
-    clawhub)        exec_step_clawhub "$step_file" ;;
-    cron)           exec_step_cron "$step_file" ;;
-    exec)           exec_step_exec "$step_file" ;;
+    file)            exec_step_file "$step_file" ;;
+    config_patch)    exec_step_config_patch "$step_file" ;;
+    config_set)      exec_step_config_set "$step_file" ;;
+    skill)           exec_step_skill "$step_file" ;;
+    clawhub)         exec_step_clawhub "$step_file" ;;
+    cron)            exec_step_cron "$step_file" ;;
+    exec)            exec_step_exec "$step_file" ;;
+    mkdir)           exec_step_mkdir "$step_file" ;;
     openclaw_update) exec_step_openclaw_update "$step_file" ;;
-    restart)        exec_step_restart ;;
-    *)              warn "Unknown step type: $step_type (skipping)" ;;
+    restart)         exec_step_restart ;;
+    *)               warn "Unknown step type: $step_type (skipping)" ;;
   esac
 }
 
@@ -195,6 +197,53 @@ exec_step_config_patch() {
   else
     warn "config_patch step without merge_file — use a JSON file in files/"
   fi
+}
+
+exec_step_config_set() {
+  local step_file="$1"
+  need_cmd openclaw
+
+  local cfg_path cfg_value
+  cfg_path="$(yaml_get "$step_file" "path")"
+  cfg_value="$(yaml_get "$step_file" "value")"
+
+  [[ -z "$cfg_path" ]] && die "config_set step missing 'path'"
+  [[ -z "$cfg_value" ]] && die "config_set step missing 'value'"
+
+  info "Setting config: $cfg_path"
+  if ! openclaw config set "$cfg_path" "$cfg_value"; then
+    die "config_set failed: openclaw config set $cfg_path"
+  fi
+}
+
+exec_step_mkdir() {
+  local step_file="$1"
+
+  # Read paths array from the step file
+  local line
+  local in_paths=false
+  local created=0
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^paths: ]]; then
+      in_paths=true
+      continue
+    fi
+    if $in_paths; then
+      if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+(.*) ]]; then
+        local dir_path="${BASH_REMATCH[1]}"
+        dir_path="$(echo "$dir_path" | sed -E 's/^["'"'"']|["'"'"']$//g')"
+        # Expand ~ to $HOME
+        dir_path="${dir_path/#\~/$HOME}"
+        mkdir -p "$dir_path"
+        info "Created directory: $dir_path"
+        created=$((created + 1))
+      else
+        break
+      fi
+    fi
+  done < "$step_file"
+
+  [[ $created -eq 0 ]] && die "mkdir step has no 'paths'"
 }
 
 exec_step_skill() {
@@ -391,8 +440,16 @@ steps:
   #   path: ~/.openclaw/workspace/EXAMPLE.md
   #   content_file: example.md
 
+  # - type: config_set
+  #   path: models.default
+  #   value: "anthropic/claude-sonnet-4-20250514"
+
   # - type: config_patch
   #   merge_file: example-config.json
+
+  # - type: mkdir
+  #   paths:
+  #     - ~/.openclaw/workspace/memory
 
   # - type: skill
   #   name: my-skill
@@ -403,7 +460,8 @@ steps:
 
   # - type: cron
   #   name: my-cron-job
-  #   job_file: my-cron-job.json
+  #   schedule: "0 9 * * *"
+  #   message: "Run my job"
 
   # - type: exec
   #   command: "echo hello"
