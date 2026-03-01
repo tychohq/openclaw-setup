@@ -8,4 +8,4 @@ steps:
     merge_file: configs/signal-channel.json
 
   - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["signal"]|unique)' $HOME/.openclaw/openclaw.json > /tmp/_oc_patch.json && mv /tmp/_oc_patch.json $HOME/.openclaw/openclaw.json
+    command: jq '.plugins.allow=((.plugins.allow//[])+["signal"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_signal.json && mv /tmp/_oc_patch_signal.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json

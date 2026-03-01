@@ -8,4 +8,4 @@ steps:
     merge_file: configs/discord-channel.json
 
   - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["discord"]|unique)' $HOME/.openclaw/openclaw.json > /tmp/_oc_patch.json && mv /tmp/_oc_patch.json $HOME/.openclaw/openclaw.json
+    command: jq '.plugins.allow=((.plugins.allow//[])+["discord"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_discord.json && mv /tmp/_oc_patch_discord.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json

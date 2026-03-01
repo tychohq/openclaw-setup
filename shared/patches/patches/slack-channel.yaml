@@ -8,4 +8,4 @@ steps:
     merge_file: configs/slack-channel.json
 
   - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["slack"]|unique)' $HOME/.openclaw/openclaw.json > /tmp/_oc_patch.json && mv /tmp/_oc_patch.json $HOME/.openclaw/openclaw.json
+    command: jq '.plugins.allow=((.plugins.allow//[])+["slack"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_slack.json && mv /tmp/_oc_patch_slack.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json

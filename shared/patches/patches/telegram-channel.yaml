@@ -8,4 +8,4 @@ steps:
     merge_file: configs/telegram-channel.json
 
   - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["telegram"]|unique)' $HOME/.openclaw/openclaw.json > /tmp/_oc_patch.json && mv /tmp/_oc_patch.json $HOME/.openclaw/openclaw.json
+    command: jq '.plugins.allow=((.plugins.allow//[])+["telegram"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_telegram.json && mv /tmp/_oc_patch_telegram.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json
