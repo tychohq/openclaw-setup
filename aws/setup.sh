@@ -119,10 +119,10 @@ if [ "$AUTO_MODE" = true ]; then
         [ -z "${SLACK_OWNER_USER_ID:-}" ] && MISSING+=("SLACK_OWNER_USER_ID (required when SLACK_BOT_TOKEN is set — your Slack member ID)")
     fi
 
-    if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+    if [ -n "${DISCORD_TOKEN:-${DISCORD_BOT_TOKEN:-}}" ]; then
         HAS_DISCORD=true
-        [ -z "${DISCORD_GUILD_ID:-}" ] && MISSING+=("DISCORD_GUILD_ID  (required when DISCORD_BOT_TOKEN is set)")
-        [ -z "${DISCORD_OWNER_ID:-}" ] && MISSING+=("DISCORD_OWNER_ID  (required when DISCORD_BOT_TOKEN is set)")
+        [ -z "${DISCORD_GUILD_ID:-}" ] && MISSING+=("DISCORD_GUILD_ID  (required when DISCORD_TOKEN is set)")
+        [ -z "${DISCORD_OWNER_ID:-}" ] && MISSING+=("DISCORD_OWNER_ID  (required when DISCORD_TOKEN is set)")
     fi
 
     if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
@@ -131,7 +131,7 @@ if [ "$AUTO_MODE" = true ]; then
     fi
 
     if [ "$HAS_SLACK" = false ] && [ "$HAS_DISCORD" = false ] && [ "$HAS_TELEGRAM" = false ]; then
-        MISSING+=("SLACK_BOT_TOKEN, DISCORD_BOT_TOKEN, or TELEGRAM_BOT_TOKEN  (at least one channel required)")
+        MISSING+=("SLACK_BOT_TOKEN, DISCORD_TOKEN, or TELEGRAM_BOT_TOKEN  (at least one channel required)")
     fi
 
     # Validate deployment name format
@@ -850,7 +850,7 @@ if [ "$CONFIG_CHOICE" = "1" ]; then
         SLACK_BOT_TOKEN_VAL="${SLACK_BOT_TOKEN:-}"
         SLACK_CHANNEL_ID="${SLACK_CHANNEL_ID:-}"
         SLACK_OWNER_ID="${SLACK_OWNER_USER_ID:-}"
-        DISCORD_TOKEN="${DISCORD_BOT_TOKEN:-}"
+        DISCORD_TOKEN="${DISCORD_TOKEN:-${DISCORD_BOT_TOKEN:-}}"
         DISCORD_GUILD_ID="${DISCORD_GUILD_ID:-}"
         DISCORD_CHANNEL_ID="${DISCORD_CHANNEL_ID:-}"
         DISCORD_OWNER_ID="${DISCORD_OWNER_ID:-}"
@@ -932,7 +932,7 @@ if [ "$CONFIG_CHOICE" = "1" ]; then
     _ENV_SLACK_BOT_TOKEN="${SLACK_BOT_TOKEN:-}"
     _ENV_SLACK_CHANNEL="${SLACK_CHANNEL_ID:-}"
     _ENV_SLACK_OWNER="${SLACK_OWNER_USER_ID:-}"
-    _ENV_DISCORD_TOKEN="${DISCORD_BOT_TOKEN:-}"
+    _ENV_DISCORD_TOKEN="${DISCORD_TOKEN:-${DISCORD_BOT_TOKEN:-}}"
     _ENV_DISCORD_GUILD="${DISCORD_GUILD_ID:-}"
     _ENV_DISCORD_CHANNEL="${DISCORD_CHANNEL_ID:-}"
     _ENV_DISCORD_OWNER="${DISCORD_OWNER_ID:-}"
@@ -1265,14 +1265,14 @@ elif [ "$CONFIG_CHOICE" = "2" ]; then
     echo "Point to your config files. Leave blank to skip any."
     echo ""
 
-    read -p "OpenClaw config JSON path [../../mac-mini-setup/openclaw-secrets.json]: " CONFIG_PATH
-    CONFIG_PATH="${CONFIG_PATH:-../../mac-mini-setup/openclaw-secrets.json}"
+    read -p "OpenClaw config JSON path [../openclaw-secrets.json]: " CONFIG_PATH
+    CONFIG_PATH="${CONFIG_PATH:-../openclaw-secrets.json}"
 
-    read -p "OpenClaw .env path [../../mac-mini-setup/openclaw-secrets.env]: " ENV_PATH
-    ENV_PATH="${ENV_PATH:-../../mac-mini-setup/openclaw-secrets.env}"
+    read -p "OpenClaw .env path [../openclaw-secrets.env]: " ENV_PATH
+    ENV_PATH="${ENV_PATH:-../openclaw-secrets.env}"
 
-    read -p "Auth profiles JSON path [../../mac-mini-setup/openclaw-auth-profiles.json]: " AUTH_PATH
-    AUTH_PATH="${AUTH_PATH:-../../mac-mini-setup/openclaw-auth-profiles.json}"
+    read -p "Auth profiles JSON path [../openclaw-auth-profiles.json]: " AUTH_PATH
+    AUTH_PATH="${AUTH_PATH:-../openclaw-auth-profiles.json}"
 
     # Validate and read config files
     if [ -n "$CONFIG_PATH" ] && [ -f "$CONFIG_PATH" ]; then

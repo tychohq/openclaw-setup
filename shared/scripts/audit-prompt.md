@@ -1,12 +1,12 @@
 # OpenClaw Setup Audit
 
-You're comparing this OpenClaw installation against the mac-mini-setup reference template.
+You're comparing this OpenClaw installation against the openclaw-setup reference template.
 
 ## Instructions
 
-1. **Run the audit script** from the mac-mini-setup repo:
+1. **Run the audit script** from the openclaw-setup repo:
    ```bash
-   cd ~/projects/mac-mini-setup && ./scripts/audit-openclaw.sh
+   cd ~/projects/openclaw-setup && shared/scripts/audit-openclaw.sh
    ```
 
 2. **Analyze the output** and organize findings into three categories:

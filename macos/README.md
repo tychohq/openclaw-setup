@@ -32,8 +32,8 @@ Everything is **idempotent** — safe to run multiple times. It skips what's alr
 Edit `config.sh` to add/remove apps, tools, and settings:
 
 ```bash
-git clone https://github.com/BrennerSpear/mac-mini-setup.git ~/projects/mac-mini-setup
-cd ~/projects/mac-mini-setup
+git clone https://github.com/BrennerSpear/openclaw-setup.git ~/projects/openclaw-setup
+cd ~/projects/openclaw-setup/macos
 
 # Edit the config
 code config.sh   # or: subl config.sh
@@ -236,10 +236,10 @@ Already have OpenClaw running? Compare your setup against this template:
 
 ```bash
 # Clone the repo (if you haven't)
-git clone https://github.com/BrennerSpear/mac-mini-setup.git ~/projects/mac-mini-setup
+git clone https://github.com/BrennerSpear/openclaw-setup.git ~/projects/openclaw-setup
 
 # Run the audit
-cd ~/projects/mac-mini-setup && ./scripts/audit-openclaw.sh
+cd ~/projects/openclaw-setup && shared/scripts/audit-openclaw.sh
 ```
 
 This compares your workspace files, config, skills, and git config against the template and reports:
@@ -248,7 +248,7 @@ This compares your workspace files, config, skills, and git config against the t
 - **Extras** — things you have that could be worth upstreaming
 
 Or ask your OpenClaw to do it:
-> "Clone https://github.com/BrennerSpear/mac-mini-setup.git to ~/projects/mac-mini-setup and run scripts/audit-openclaw.sh, then read scripts/audit-prompt.md and give me a full analysis"
+> "Clone https://github.com/BrennerSpear/openclaw-setup.git to ~/projects/openclaw-setup and run shared/scripts/audit-openclaw.sh, then read shared/scripts/audit-prompt.md and give me a full analysis"
 
 ## For teams
 

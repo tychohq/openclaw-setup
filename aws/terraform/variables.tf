@@ -37,7 +37,7 @@ variable "ebs_volume_size" {
 
 # ── OpenClaw Config Files ──────────────────────────────────────────────────────
 # Pass the CONTENT of your filled-in config files.
-# These match the mac-mini-setup config format exactly.
+# These match the shared/config/ template format exactly.
 
 variable "openclaw_config_json" {
   description = "Content of your openclaw config JSON (from openclaw-secrets.json). Leave empty to configure manually via SSH."

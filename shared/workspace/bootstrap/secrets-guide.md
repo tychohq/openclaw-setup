@@ -54,8 +54,8 @@ DISCORD_TOKEN=MTQ3...
 
 ### Config file (`~/.openclaw/openclaw.json`)
 Channel configuration (Discord guilds, Telegram groups, etc.)
-See `~/projects/mac-mini-setup/config/` for templates.
+See `~/projects/openclaw-setup/shared/config/` for templates.
 
 ## After adding keys
 Restart the gateway: `openclaw gateway restart`
-Verify: `cd ~/projects/mac-mini-setup && scripts/setup-openclaw.sh --check`
+Verify: `cd ~/projects/openclaw-setup && shared/scripts/setup-openclaw.sh --check`

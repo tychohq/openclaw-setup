@@ -24,7 +24,7 @@ The setup script already configured: `init.defaultBranch main`, `pull.rebase tru
 - [ ] OpenRouter API key (if using)
 - [ ] Gemini API key (for memory search embeddings)
 - [ ] Brave Search API key (for web search)
-- [ ] Verify: `scripts/setup-openclaw.sh --check` from mac-mini-setup repo
+- [ ] Verify: `shared/scripts/setup-openclaw.sh --check` from openclaw-setup repo
 
 ## 5. Channel Setup
 - [ ] Discord bot connected and responding (if using)

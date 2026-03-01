@@ -7,8 +7,8 @@ set -euo pipefail
 # curl -fsSL mac.brennerspear.com | bash -s -- --handoff   # hand off to Claude Code after
 # =============================================================================
 
-REPO_URL="https://github.com/BrennerSpear/mac-mini-setup.git"
-CLONE_DIR="$HOME/projects/mac-mini-setup"
+REPO_URL="https://github.com/BrennerSpear/openclaw-setup.git"
+CLONE_DIR="$HOME/projects/openclaw-setup"
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
@@ -20,7 +20,7 @@ echo ""
 # When piped via curl|bash, stdin isn't a terminal so sudo can't prompt.
 # We read the password from /dev/tty and enable passwordless sudo for the
 # duration of setup, then remove it at the end.
-SUDOERS_TMP="/etc/sudoers.d/mac-mini-setup-temp"
+SUDOERS_TMP="/etc/sudoers.d/openclaw-setup-temp"
 cleanup_sudo() {
   sudo rm -f "$SUDOERS_TMP" 2>/dev/null || true
 }
@@ -62,7 +62,10 @@ mkdir -p "$(dirname "$CLONE_DIR")"
 if [ -d "$CLONE_DIR/.git" ]; then
   echo ">>> Repo already cloned at $CLONE_DIR — updating..."
   git -C "$CLONE_DIR" fetch origin
-  git -C "$CLONE_DIR" reset --hard origin/main
+  if ! git -C "$CLONE_DIR" pull --ff-only 2>/dev/null; then
+    echo "  ⚠️  Local changes detected — skipping auto-update."
+    echo "     Manually pull or reset if you want the latest version."
+  fi
 else
   echo ">>> Cloning setup repo..."
   git clone "$REPO_URL" "$CLONE_DIR"
@@ -72,5 +75,5 @@ fi
 echo ""
 echo ">>> Running setup script..."
 echo ""
-chmod +x "$CLONE_DIR/setup.sh"
-"$CLONE_DIR/setup.sh" "$@"
+chmod +x "$CLONE_DIR/macos/setup.sh"
+"$CLONE_DIR/macos/setup.sh" "$@"
