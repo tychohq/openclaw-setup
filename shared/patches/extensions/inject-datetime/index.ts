@@ -26,12 +26,26 @@ function getTimezone(config: unknown): string {
   }
 }
 
+function getShortTz(timezone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const tzPart = parts.find((p) => p.type === "timeZoneName");
+    return tzPart?.value || timezone;
+  } catch {
+    return timezone;
+  }
+}
+
 export default function register(api: OpenClawPluginApi) {
   api.on(
     "before_prompt_build",
     async (_event: BeforePromptBuildEvent): Promise<BeforePromptBuildResult | void> => {
       try {
         const timezone = getTimezone(api.config);
+        const shortTz = getShortTz(timezone);
 
         const now = new Date().toLocaleString("en-US", {
           timeZone: timezone,
@@ -46,7 +60,7 @@ export default function register(api: OpenClawPluginApi) {
         });
 
         return {
-          prependContext: `[Current date/time: ${now} (${timezone})]`,
+          prependContext: `[Current date/time: ${now} (${shortTz})]`,
         };
       } catch (err) {
         api.logger.warn?.(`[inject-datetime] Hook error: ${err}`);
