@@ -239,7 +239,7 @@ test_xdg_runtime_dir_setup() {
 # ── Repo Clone & Post-Clone ─────────────────────────────────────────────────
 
 test_git_clone_repo() {
-  grep -q 'git clone.*BrennerSpear/openclaw-setup.git.*~/openclaw-setup' "$TEMPLATE"
+  grep -q 'git clone.*tychohq/openclaw-setup.git.*~/openclaw-setup' "$TEMPLATE"
 }
 
 test_post_clone_setup() {

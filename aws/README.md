@@ -19,7 +19,7 @@ Pricing varies by region and instance size; adjust `instance_type` and `ebs_volu
 ## Quick Start (First Time)
 
 ```bash
-git clone https://github.com/BrennerSpear/openclaw-setup.git
+git clone https://github.com/tychohq/openclaw-setup.git
 cd openclaw-setup/aws
 ./setup.sh
 ```
@@ -150,7 +150,7 @@ Secrets files are gitignored and live at the repo root. The `terraform.tfvars` w
 
 ```bash
 cd ~/projects
-git clone https://github.com/BrennerSpear/openclaw-setup.git
+git clone https://github.com/tychohq/openclaw-setup.git
 ```
 
 **2. Fill in your secrets:**

@@ -23,6 +23,9 @@ tfplan
 .tldr/
 .tldrignore
 
+# Internal project docs / PRDs / audits
+meta/
+
 # OS
 .DS_Store
 

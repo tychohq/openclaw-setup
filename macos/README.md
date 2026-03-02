@@ -32,7 +32,7 @@ Everything is **idempotent** — safe to run multiple times. It skips what's alr
 Edit `config.sh` to add/remove apps, tools, and settings:
 
 ```bash
-git clone https://github.com/BrennerSpear/openclaw-setup.git ~/projects/openclaw-setup
+git clone https://github.com/tychohq/openclaw-setup.git ~/projects/openclaw-setup
 cd ~/projects/openclaw-setup/macos
 
 # Edit the config
@@ -236,7 +236,7 @@ Already have OpenClaw running? Compare your setup against this template:
 
 ```bash
 # Clone the repo (if you haven't)
-git clone https://github.com/BrennerSpear/openclaw-setup.git ~/projects/openclaw-setup
+git clone https://github.com/tychohq/openclaw-setup.git ~/projects/openclaw-setup
 
 # Run the audit
 cd ~/projects/openclaw-setup && shared/scripts/audit-openclaw.sh
@@ -248,7 +248,7 @@ This compares your workspace files, config, skills, and git config against the t
 - **Extras** — things you have that could be worth upstreaming
 
 Or ask your OpenClaw to do it:
-> "Clone https://github.com/BrennerSpear/openclaw-setup.git to ~/projects/openclaw-setup and run shared/scripts/audit-openclaw.sh, then read shared/scripts/audit-prompt.md and give me a full analysis"
+> "Clone https://github.com/tychohq/openclaw-setup.git to ~/projects/openclaw-setup and run shared/scripts/audit-openclaw.sh, then read shared/scripts/audit-prompt.md and give me a full analysis"
 
 ## For teams
 

@@ -7,7 +7,7 @@ set -euo pipefail
 # curl -fsSL mac.brennerspear.com | bash -s -- --handoff   # hand off to Claude Code after
 # =============================================================================
 
-REPO_URL="https://github.com/BrennerSpear/openclaw-setup.git"
+REPO_URL="https://github.com/tychohq/openclaw-setup.git"
 CLONE_DIR="$HOME/projects/openclaw-setup"
 
 echo ""

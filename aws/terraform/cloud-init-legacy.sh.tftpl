@@ -247,7 +247,7 @@ mkdir -p "$CHECKLIST_DEST"
 # Clone only the checklist directory from the repo (sparse checkout)
 REPO_TMP=$(mktemp -d)
 git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/BrennerSpear/openclaw-setup.git "$REPO_TMP" 2>/dev/null || true
+  https://github.com/tychohq/openclaw-setup.git "$REPO_TMP" 2>/dev/null || true
 
 if [ -d "$REPO_TMP/.git" ]; then
   cd "$REPO_TMP"
