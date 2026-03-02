@@ -6,6 +6,7 @@
   <title>OpenClaw Setup Catalog</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -176,7 +177,7 @@
     <div class="max-w-5xl mx-auto flex items-center justify-between">
       <span id="selected-count" class="text-sm text-gray-400"></span>
       <button onclick="downloadBundle()" class="px-5 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white font-medium text-sm cursor-pointer transition-colors" type="button">
-        Download Bundle
+        Save Bundle
       </button>
     </div>
   </div>
@@ -420,7 +421,7 @@ function switchTab(tab) {
 }
 
 // ── Download Bundle ──
-function downloadBundle() {
+function buildBundleFiles() {
   const selectedPatches = state.patches.filter(p => state.selected.has(p.id));
   const embeddedConfigs = {};
 
@@ -434,10 +435,9 @@ function downloadBundle() {
   }
 
   const selectedCronJobs = state.cronJobs.filter(j => state.cronSelected.has(j.name));
-
   const selectedSkills = state.skills.filter(s => state.skillsSelected.has(s.slug));
 
-  const bundle = {
+  const configBundle = {
     manifest: {
       version: '1.0.0',
       generated: new Date().toISOString(),
@@ -449,27 +449,63 @@ function downloadBundle() {
     },
     patches: selectedPatches,
     configs: embeddedConfigs,
-    cronJobs: selectedCronJobs,
-    skills: selectedSkills.map(s => ({
-      slug: s.slug,
-      displayName: s.displayName,
-      summary: s.summary,
-      version: s.latestVersion?.version,
-    })),
   };
 
   if (state.bundledSelected.size > 0) {
-    bundle.skills = bundle.skills || {};
-    bundle.allowBundled = [...state.bundledSelected].sort();
+    configBundle.allowBundled = [...state.bundledSelected].sort();
   }
 
-  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+  const cronSelections = selectedCronJobs;
+
+  const skillsList = selectedSkills.map(s => ({
+    slug: s.slug,
+    displayName: s.displayName,
+    summary: s.summary,
+    version: s.latestVersion?.version,
+  }));
+
+  return {
+    'config-bundle.json': JSON.stringify(configBundle, null, 2),
+    'cron-selections.json': JSON.stringify(cronSelections, null, 2),
+    'skills-list.json': JSON.stringify(skillsList, null, 2),
+  };
+}
+
+async function saveToDirectory(files) {
+  const dirHandle = await window.showDirectoryPicker();
+  for (const [name, content] of Object.entries(files)) {
+    const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+  }
+}
+
+async function saveAsZip(files) {
+  const zip = new JSZip();
+  for (const [name, content] of Object.entries(files)) {
+    zip.file(name, content);
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `openclaw-bundle-${Date.now()}.json`;
+  a.download = `openclaw-bundle-${Date.now()}.zip`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function downloadBundle() {
+  const files = buildBundleFiles();
+  if ('showDirectoryPicker' in window) {
+    try {
+      await saveToDirectory(files);
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('Save failed:', err);
+    }
+  } else {
+    await saveAsZip(files);
+  }
 }
 
 // ── Cron Jobs ──

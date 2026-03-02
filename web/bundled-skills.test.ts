@@ -4,6 +4,13 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 
 GlobalRegistrator.register();
 
+// Stub JSZip before evaluating the script
+(globalThis as any).JSZip = class {
+  _files: Record<string, string> = {};
+  file(name: string, content: string) { this._files[name] = content; }
+  async generateAsync() { return new Blob(['zip-content']); }
+};
+
 const htmlSource = readFileSync(new URL('./index.html', import.meta.url), 'utf-8');
 
 // Extract just the <script> block content
@@ -235,43 +242,129 @@ describe('updateDownloadBar', () => {
   });
 });
 
-describe('downloadBundle integration', () => {
-  test('includes allowBundled sorted when skills selected', () => {
+describe('buildBundleFiles', () => {
+  test('returns three file entries', () => {
+    const files = (globalThis as any).buildBundleFiles();
+    expect(Object.keys(files)).toEqual(['config-bundle.json', 'cron-selections.json', 'skills-list.json']);
+  });
+
+  test('config-bundle.json includes allowBundled sorted when bundled selected', () => {
     (globalThis as any).state.bundledSelected.add('slack');
     (globalThis as any).state.bundledSelected.add('discord');
     (globalThis as any).state.bundledSelected.add('github');
 
-    let capturedJson = '';
-    const origBlob = globalThis.Blob;
-    (globalThis as any).Blob = class { constructor(parts: string[]) { capturedJson = parts[0]; } };
-    const origURL = globalThis.URL;
-    (globalThis as any).URL = { createObjectURL: () => '#', revokeObjectURL: () => {} };
+    const files = (globalThis as any).buildBundleFiles();
+    const config = JSON.parse(files['config-bundle.json']);
 
-    (globalThis as any).downloadBundle();
-    const bundle = JSON.parse(capturedJson);
-
-    expect(bundle.manifest.selectedBundledSkills).toEqual(
+    expect(config.manifest.selectedBundledSkills).toEqual(
       expect.arrayContaining(['discord', 'slack', 'github'])
     );
-    expect(bundle.allowBundled).toEqual(['discord', 'github', 'slack']);
-
-    globalThis.Blob = origBlob;
-    (globalThis as any).URL = origURL;
+    expect(config.allowBundled).toEqual(['discord', 'github', 'slack']);
   });
 
-  test('omits allowBundled when none selected', () => {
-    let capturedJson = '';
-    const origBlob = globalThis.Blob;
-    (globalThis as any).Blob = class { constructor(parts: string[]) { capturedJson = parts[0]; } };
+  test('config-bundle.json omits allowBundled when none selected', () => {
+    const files = (globalThis as any).buildBundleFiles();
+    const config = JSON.parse(files['config-bundle.json']);
+    expect(config.allowBundled).toBeUndefined();
+  });
+
+  test('config-bundle.json includes patches and configs', () => {
+    (globalThis as any).state.patches = [
+      { id: 'test-patch', description: 'test', steps: [{ type: 'config_patch', merge_file: 'test.json' }] },
+    ];
+    (globalThis as any).state.selected.add('test-patch');
+    (globalThis as any).state.configs['test-patch-0'] = { key: 'value' };
+
+    const files = (globalThis as any).buildBundleFiles();
+    const config = JSON.parse(files['config-bundle.json']);
+    expect(config.patches).toHaveLength(1);
+    expect(config.patches[0].id).toBe('test-patch');
+    expect(config.configs['test.json']).toEqual({ key: 'value' });
+  });
+
+  test('cron-selections.json includes selected cron jobs', () => {
+    (globalThis as any).state.cronJobs = [
+      { name: 'job-a', schedule: { expr: '0 9 * * *' }, payload: { message: 'hi' } },
+      { name: 'job-b', schedule: { expr: '0 12 * * *' }, payload: { message: 'hello' } },
+    ];
+    (globalThis as any).state.cronSelected.add('job-a');
+
+    const files = (globalThis as any).buildBundleFiles();
+    const crons = JSON.parse(files['cron-selections.json']);
+    expect(crons).toHaveLength(1);
+    expect(crons[0].name).toBe('job-a');
+  });
+
+  test('skills-list.json includes selected skill info', () => {
+    (globalThis as any).state.skills = [
+      { slug: 'my-skill', displayName: 'My Skill', summary: 'desc', latestVersion: { version: '1.0.0' } },
+    ];
+    (globalThis as any).state.skillsSelected.add('my-skill');
+
+    const files = (globalThis as any).buildBundleFiles();
+    const skills = JSON.parse(files['skills-list.json']);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].slug).toBe('my-skill');
+    expect(skills[0].displayName).toBe('My Skill');
+  });
+});
+
+describe('downloadBundle routing', () => {
+  test('uses showDirectoryPicker when available', async () => {
+    let pickerCalled = false;
+    const writtenFiles: Record<string, string> = {};
+
+    (globalThis as any).window.showDirectoryPicker = async () => {
+      pickerCalled = true;
+      return {
+        getFileHandle: async (name: string) => ({
+          createWritable: async () => ({
+            write: async (content: string) => { writtenFiles[name] = content; },
+            close: async () => {},
+          }),
+        }),
+      };
+    };
+
+    await (globalThis as any).downloadBundle();
+    expect(pickerCalled).toBe(true);
+    expect(Object.keys(writtenFiles)).toEqual(['config-bundle.json', 'cron-selections.json', 'skills-list.json']);
+
+    delete (globalThis as any).window.showDirectoryPicker;
+  });
+
+  test('falls back to zip when showDirectoryPicker unavailable', async () => {
+    delete (globalThis as any).window.showDirectoryPicker;
+
+    let downloadTriggered = false;
     const origURL = globalThis.URL;
-    (globalThis as any).URL = { createObjectURL: () => '#', revokeObjectURL: () => {} };
+    (globalThis as any).URL = {
+      createObjectURL: () => '#',
+      revokeObjectURL: () => {},
+    };
+    const origCreateElement = document.createElement.bind(document);
+    document.createElement = ((tag: string) => {
+      const el = origCreateElement(tag);
+      if (tag === 'a') {
+        el.click = () => { downloadTriggered = true; };
+      }
+      return el;
+    }) as typeof document.createElement;
 
-    (globalThis as any).downloadBundle();
-    const bundle = JSON.parse(capturedJson);
+    await (globalThis as any).downloadBundle();
+    expect(downloadTriggered).toBe(true);
 
-    expect(bundle.allowBundled).toBeUndefined();
-
-    globalThis.Blob = origBlob;
     (globalThis as any).URL = origURL;
+    document.createElement = origCreateElement;
+  });
+
+  test('handles AbortError silently when user cancels picker', async () => {
+    const abortErr = new DOMException('User cancelled', 'AbortError');
+    (globalThis as any).window.showDirectoryPicker = async () => { throw abortErr; };
+
+    // Should not throw
+    await (globalThis as any).downloadBundle();
+
+    delete (globalThis as any).window.showDirectoryPicker;
   });
 });
