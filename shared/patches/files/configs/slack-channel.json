@@ -1,11 +1,4 @@
 {
-  "plugins": {
-    "entries": {
-      "slack": {
-        "enabled": true
-      }
-    }
-  },
   "channels": {
     "slack": {
       "enabled": true,

@@ -1,11 +1,4 @@
 {
-  "plugins": {
-    "entries": {
-      "telegram": {
-        "enabled": true
-      }
-    }
-  },
   "channels": {
     "telegram": {
       "enabled": true,

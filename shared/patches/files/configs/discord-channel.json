@@ -1,11 +1,4 @@
 {
-  "plugins": {
-    "entries": {
-      "discord": {
-        "enabled": true
-      }
-    }
-  },
   "channels": {
     "discord": {
       "enabled": true,

@@ -134,6 +134,7 @@ exec_step() {
     file)            exec_step_file "$step_file" ;;
     config_patch)    exec_step_config_patch "$step_file" ;;
     config_set)      exec_step_config_set "$step_file" ;;
+    plugin_enable)   exec_step_plugin_enable "$step_file" ;;
     skill)           exec_step_skill "$step_file" ;;
     clawhub)         exec_step_clawhub "$step_file" ;;
     cron)            exec_step_cron "$step_file" ;;
@@ -239,6 +240,20 @@ exec_step_config_set() {
   info "Setting config: $cfg_path"
   if ! openclaw config set "$cfg_path" "$cfg_value"; then
     die "config_set failed: openclaw config set $cfg_path"
+  fi
+}
+
+exec_step_plugin_enable() {
+  local step_file="$1"
+  need_cmd openclaw
+
+  local plugin_id
+  plugin_id="$(yaml_get "$step_file" "plugin")"
+  [[ -z "$plugin_id" ]] && die "plugin_enable step missing 'plugin'"
+
+  info "Enabling plugin: $plugin_id"
+  if ! OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw plugins enable "$plugin_id"; then
+    die "plugin_enable failed: openclaw plugins enable $plugin_id"
   fi
 }
 
@@ -593,6 +608,14 @@ cmd_validate() {
           mf="$(yaml_get "$step" "merge_file")"
           if [[ -n "$mf" && ! -f "$FILES_DIR/$mf" ]]; then
             warn "$id: merge_file not found: files/$mf"
+            errors=$((errors + 1))
+          fi
+          ;;
+        plugin_enable)
+          local pe
+          pe="$(yaml_get "$step" "plugin")"
+          if [[ -z "$pe" ]]; then
+            warn "$id: plugin_enable step missing 'plugin'"
             errors=$((errors + 1))
           fi
           ;;

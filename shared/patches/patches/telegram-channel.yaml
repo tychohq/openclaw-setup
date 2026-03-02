@@ -4,5 +4,8 @@ targets: ["*"]
 created: 2026-03-01T22:06:00Z
 
 steps:
+  - type: plugin_enable
+    plugin: telegram
+
   - type: config_patch
     merge_file: configs/telegram-channel.json

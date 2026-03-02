@@ -5,12 +5,5 @@
       "dmPolicy": "pairing",
       "groupPolicy": "allowlist"
     }
-  },
-  "plugins": {
-    "entries": {
-      "signal": {
-        "enabled": true
-      }
-    }
   }
 }
