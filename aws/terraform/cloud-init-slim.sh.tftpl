@@ -66,6 +66,7 @@ if ! grep -q "^GATEWAY_AUTH_TOKEN=." /home/ec2-user/.openclaw/.env; then
   fi
 fi
 chmod 600 /home/ec2-user/.openclaw/.env
+chown -R ec2-user:ec2-user /home/ec2-user/.openclaw
 echo "[$(date)] .env file written."
 
 # ── systemd User Service ──────────────────────────────────────────────────────
