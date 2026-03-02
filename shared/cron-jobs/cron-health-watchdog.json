@@ -11,7 +11,6 @@
   "payload": {
     "kind": "agentTurn",
     "message": "You are a cron health monitor. Check ALL cron jobs for failures.\n\n1. Use the cron tool: action=list, includeDisabled=false\n\n2. For each enabled job, check state.consecutiveErrors.\n\n3. If ANY job has consecutiveErrors >= 3, send an alert via the message tool to your configured channel:\n\n   🚨 **Cron Health Alert**\n\n   For each failing job:\n   ❌ **job-name** — X consecutive errors\n      Last error: <error message>\n      Schedule: <schedule description>\n\n   Then suggest fixes (usually model issues or script errors).\n\n4. If all jobs are healthy (0 consecutive errors), reply: SKIP\n\nYour ENTIRE response must be ONLY the alert or SKIP. No reasoning or narration.",
-    "model": "anthropic/claude-sonnet-4-20250514",
     "timeoutSeconds": 60
   },
   "delivery": {

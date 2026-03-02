@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Setup Catalog</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0a0a',
+            card: '#1a1a2e',
+            accent: '#6366f1',
+            'accent-hover': '#818cf8',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0a0a0a; }
+    .json-key { color: #93c5fd; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-bool { color: #f472b6; }
+    .json-null { color: #9ca3af; }
+    .badge-config_patch { background: #312e81; color: #a5b4fc; }
+    .badge-exec { background: #7c2d12; color: #fdba74; }
+    .badge-restart { background: #164e63; color: #67e8f9; }
+    .badge-copy { background: #1e3a2f; color: #6ee7b7; }
+    .badge-default { background: #27272a; color: #a1a1aa; }
+    .badge-requires { background: #422006; color: #fbbf24; border: 1px solid #854d0e; }
+    .badge-schedule { background: #0d3b3b; color: #5eead4; border: 1px solid #115e59; }
+    .tab-active { border-bottom: 2px solid #6366f1; color: #e5e7eb; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+    .card-expand { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .card-expand.open { max-height: 2000px; transition: max-height 0.5s ease-in; }
+  </style>
+</head>
+<body class="text-gray-200 min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-gray-800 px-6 py-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-accent flex items-center justify-center font-bold text-white text-sm">OC</div>
+        <h1 class="text-xl font-semibold text-white">OpenClaw <span class="text-gray-400 font-normal">Setup Catalog</span></h1>
+      </div>
+      <div id="mode-badge" class="text-xs px-2 py-1 rounded bg-gray-800 text-gray-400"></div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="border-b border-gray-800 px-6">
+    <div class="max-w-5xl mx-auto flex gap-6">
+      <button onclick="switchTab('patches')" id="tab-patches" class="tab-active py-3 px-1 text-sm font-medium cursor-pointer">Patches</button>
+      <button onclick="switchTab('cron')" id="tab-cron" class="tab-inactive py-3 px-1 text-sm font-medium cursor-pointer">Cron Jobs</button>
+      <button onclick="switchTab('skills')" id="tab-skills" class="tab-inactive py-3 px-1 text-sm font-medium cursor-pointer">Skills</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-5xl mx-auto px-6 py-6">
+
+    <!-- Patches Tab -->
+    <div id="panel-patches">
+      <!-- Controls -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+          <button onclick="selectAll()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Select All</button>
+          <button onclick="deselectAll()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Deselect All</button>
+        </div>
+        <div id="loading" class="text-sm text-gray-500">Loading patches...</div>
+      </div>
+
+      <!-- Patch Grid -->
+      <div id="patch-grid" class="grid gap-3"></div>
+    </div>
+
+    <!-- Cron Tab -->
+    <div id="panel-cron" class="hidden">
+      <!-- Settings Bar -->
+      <div class="bg-gray-900/60 rounded-lg border border-gray-800 p-4 mb-4">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <!-- Timezone -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Timezone</label>
+            <select id="cron-tz" onchange="applyCronSettings()" class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-300 cursor-pointer">
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Chicago">America/Chicago</option>
+              <option value="America/Denver">America/Denver</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="Asia/Tokyo">Asia/Tokyo</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </div>
+          <!-- Delivery -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Delivery</label>
+            <div class="flex items-center gap-3 text-xs text-gray-300">
+              <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="cron-delivery" value="none" checked onchange="applyCronSettings()" class="accent-accent" /> None</label>
+              <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="cron-delivery" value="discord" onchange="applyCronSettings()" class="accent-accent" /> Discord</label>
+              <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="cron-delivery" value="slack" onchange="applyCronSettings()" class="accent-accent" /> Slack</label>
+              <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="cron-delivery" value="telegram" onchange="applyCronSettings()" class="accent-accent" /> Telegram</label>
+            </div>
+            <input type="text" id="cron-channel-id" placeholder="Channel ID" oninput="applyCronSettings()"
+                   class="hidden text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-300 w-40" />
+          </div>
+          <!-- Model Override -->
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Model</label>
+            <select id="cron-model" onchange="applyCronSettings()" class="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-gray-300 cursor-pointer">
+              <option value="">Default (gateway)</option>
+              <option value="anthropic/claude-opus-4-6">Opus</option>
+              <option value="anthropic/claude-sonnet-4-6">Sonnet</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <!-- Controls -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+          <button onclick="selectAllCron()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Select All</button>
+          <button onclick="deselectAllCron()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Deselect All</button>
+        </div>
+        <div id="cron-loading" class="text-sm text-gray-500">Loading cron jobs...</div>
+      </div>
+      <!-- Cron Grid -->
+      <div id="cron-grid" class="grid gap-3"></div>
+    </div>
+
+    <!-- Skills Tab -->
+    <div id="panel-skills" class="hidden">
+      <div class="text-center py-20">
+        <div class="text-4xl mb-4">&#9889;</div>
+        <p class="text-gray-400 text-lg mb-4">Browse skills on ClawHub</p>
+        <a href="https://clawhub.com" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-white font-medium transition-colors">
+          Go to ClawHub &rarr;
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Floating Download Bar -->
+  <div id="download-bar" class="fixed bottom-0 left-0 right-0 bg-card border-t border-gray-800 px-6 py-3 translate-y-full transition-transform duration-200" style="z-index:50;">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <span id="selected-count" class="text-sm text-gray-400"></span>
+      <button onclick="downloadBundle()" class="px-5 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white font-medium text-sm cursor-pointer transition-colors" type="button">
+        Download Bundle
+      </button>
+    </div>
+  </div>
+
+<script>
+// ── State ──
+const state = {
+  patches: [],       // {id, description, targets, created, steps[], configData?}
+  selected: new Set(),
+  configs: {},       // id → parsed JSON
+  cronJobs: [],      // loaded cron job objects
+  cronSelected: new Set(),
+};
+
+// ── Mode detection ──
+const params = new URLSearchParams(window.location.search);
+const LOCAL = params.get('local') === 'true' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const GITHUB_REPO = 'tychohq/openclaw-setup';
+const GITHUB_BRANCH = 'main';
+
+document.getElementById('mode-badge').textContent = LOCAL ? 'Local' : 'GitHub';
+
+// ── URL helpers ──
+function rawUrl(path) {
+  if (LOCAL) return '../' + path;
+  return `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${path}`;
+}
+
+// ── Data loading ──
+async function loadCatalog() {
+  try {
+    const catalogUrl = LOCAL
+      ? 'catalog.json'
+      : `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/web/catalog.json`;
+    const res = await fetch(catalogUrl);
+    if (!res.ok) throw new Error(`Failed to fetch catalog: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Catalog load error:', err);
+    return [];
+  }
+}
+
+async function loadPatch(id) {
+  const url = rawUrl(`shared/patches/patches/${id}.yaml`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch patch ${id}: ${res.status}`);
+  const text = await res.text();
+  return jsyaml.load(text);
+}
+
+async function loadConfig(filename) {
+  const url = rawUrl(`shared/patches/files/${filename}`);
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+// ── Rendering ──
+function humanize(id) {
+  return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function badgeClass(type) {
+  const known = ['config_patch', 'exec', 'restart', 'copy'];
+  return known.includes(type) ? `badge-${type}` : 'badge-default';
+}
+
+function syntaxHighlight(json) {
+  const str = JSON.stringify(json, null, 2);
+  return str.replace(
+    /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    match => {
+      let cls = 'json-number';
+      if (/^"/.test(match)) {
+        cls = /:$/.test(match) ? 'json-key' : 'json-string';
+      } else if (/true|false/.test(match)) {
+        cls = 'json-bool';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
+      }
+      return `<span class="${cls}">${match}</span>`;
+    }
+  );
+}
+
+function renderPatchCard(patch) {
+  const stepTypes = [...new Set(patch.steps.map(s => s.type))];
+  const isSelected = state.selected.has(patch.id);
+
+  const card = document.createElement('div');
+  card.className = 'bg-card rounded-lg border border-gray-800 hover:border-gray-700 transition-colors';
+  card.id = `patch-${patch.id}`;
+
+  card.innerHTML = `
+    <div class="p-4 cursor-pointer select-none" onclick="toggleExpand('${patch.id}')">
+      <div class="flex items-start gap-3">
+        <input type="checkbox" class="mt-1 accent-accent w-4 h-4 cursor-pointer rounded"
+               ${isSelected ? 'checked' : ''}
+               onclick="event.stopPropagation(); toggleSelect('${patch.id}')" />
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="font-medium text-white text-sm">${humanize(patch.id)}</h3>
+            ${stepTypes.filter(t => t !== 'config_patch').map(t => `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${badgeClass(t)}">${t}</span>`).join('')}
+          </div>
+          <p class="text-gray-400 text-sm mt-1">${patch.description}</p>
+          ${(patch.requires && patch.requires.length) ? `
+            <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+              <svg class="w-3 h-3 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/></svg>
+              ${patch.requires.map(r => `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono badge-requires">${r}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+        <svg id="chevron-${patch.id}" class="w-4 h-4 text-gray-500 transition-transform flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+    </div>
+    <div id="detail-${patch.id}" class="card-expand">
+      <div class="px-4 pb-4 border-t border-gray-800 pt-3">
+        <div class="mb-3">
+          <span class="text-xs text-gray-500 uppercase tracking-wide">Targets</span>
+          <span class="text-xs text-gray-400 ml-2">${(patch.targets || []).join(', ')}</span>
+        </div>
+        <div class="mb-2">
+          <span class="text-xs text-gray-500 uppercase tracking-wide">Steps</span>
+        </div>
+        ${patch.steps.map((step, i) => `
+          <div class="mb-2 rounded bg-black/30 p-2">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${badgeClass(step.type)}">${step.type}</span>
+              ${step.merge_file ? `<span class="text-xs text-gray-500 font-mono">${step.merge_file}</span>` : ''}
+              ${step.command ? `<span class="text-xs text-gray-500 font-mono truncate max-w-md">${escapeHtml(step.command)}</span>` : ''}
+            </div>
+            ${step.merge_file && state.configs[patch.id + '-' + i] ? `
+              <pre class="text-xs mt-1 overflow-x-auto leading-relaxed">${syntaxHighlight(state.configs[patch.id + '-' + i])}</pre>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  return card;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderAllPatches() {
+  const grid = document.getElementById('patch-grid');
+  grid.innerHTML = '';
+  for (const patch of state.patches) {
+    grid.appendChild(renderPatchCard(patch));
+  }
+}
+
+// ── Interactions ──
+function toggleExpand(id) {
+  const detail = document.getElementById(`detail-${id}`);
+  const chevron = document.getElementById(`chevron-${id}`);
+  detail.classList.toggle('open');
+  chevron.style.transform = detail.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function toggleSelect(id) {
+  if (state.selected.has(id)) {
+    state.selected.delete(id);
+  } else {
+    state.selected.add(id);
+  }
+  updateCheckbox(id);
+  updateDownloadBar();
+}
+
+function updateCheckbox(id) {
+  const card = document.getElementById(`patch-${id}`);
+  if (!card) return;
+  const cb = card.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = state.selected.has(id);
+}
+
+function selectAll() {
+  for (const p of state.patches) state.selected.add(p.id);
+  for (const p of state.patches) updateCheckbox(p.id);
+  updateDownloadBar();
+}
+
+function deselectAll() {
+  state.selected.clear();
+  for (const p of state.patches) updateCheckbox(p.id);
+  updateDownloadBar();
+}
+
+function updateDownloadBar() {
+  const bar = document.getElementById('download-bar');
+  const count = document.getElementById('selected-count');
+  const patchCount = state.selected.size;
+  const cronCount = state.cronSelected.size;
+  const total = patchCount + cronCount;
+  if (total > 0) {
+    bar.classList.remove('translate-y-full');
+    const parts = [];
+    if (patchCount > 0) parts.push(`${patchCount} patch${patchCount === 1 ? '' : 'es'}`);
+    if (cronCount > 0) parts.push(`${cronCount} cron job${cronCount === 1 ? '' : 's'}`);
+    count.textContent = parts.join(', ') + ' selected';
+  } else {
+    bar.classList.add('translate-y-full');
+  }
+}
+
+// ── Tabs ──
+function switchTab(tab) {
+  const tabs = ['patches', 'cron', 'skills'];
+  for (const t of tabs) {
+    document.getElementById(`tab-${t}`).className = t === tab ? 'tab-active py-3 px-1 text-sm font-medium cursor-pointer' : 'tab-inactive py-3 px-1 text-sm font-medium cursor-pointer';
+    document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+  }
+}
+
+// ── Download Bundle ──
+function downloadBundle() {
+  const selectedPatches = state.patches.filter(p => state.selected.has(p.id));
+  const embeddedConfigs = {};
+
+  for (const patch of selectedPatches) {
+    for (let i = 0; i < patch.steps.length; i++) {
+      const key = patch.id + '-' + i;
+      if (state.configs[key]) {
+        embeddedConfigs[patch.steps[i].merge_file] = state.configs[key];
+      }
+    }
+  }
+
+  const selectedCronJobs = state.cronJobs.filter(j => state.cronSelected.has(j.name));
+
+  const bundle = {
+    manifest: {
+      version: '1.0.0',
+      generated: new Date().toISOString(),
+      source: LOCAL ? 'local' : `github:${GITHUB_REPO}`,
+      selectedPatches: [...state.selected],
+      selectedCronJobs: [...state.cronSelected],
+    },
+    patches: selectedPatches,
+    configs: embeddedConfigs,
+    cronJobs: selectedCronJobs,
+  };
+
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `openclaw-bundle-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Cron Jobs ──
+const ALERT_JOBS = new Set(['system-watchdog', 'error-log-digest', 'cron-health-watchdog']);
+
+async function loadCronCatalog() {
+  try {
+    const url = LOCAL
+      ? 'cron-catalog.json'
+      : `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/web/cron-catalog.json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch cron catalog: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Cron catalog load error:', err);
+    return [];
+  }
+}
+
+async function loadCronJob(id) {
+  const url = rawUrl(`shared/cron-jobs/${id}.json`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch cron job ${id}: ${res.status}`);
+  return await res.json();
+}
+
+function humanizeSchedule(expr) {
+  const parts = expr.split(' ');
+  if (parts.length !== 5) return expr;
+  const [min, hour, dom, mon, dow] = parts;
+  if (min === '0' && hour.startsWith('*/')) return `Every ${hour.slice(2)}h`;
+  if (min === '0' && hour === '*') return 'Every hour';
+  if (min === '0' && dom === '*' && mon === '*' && dow === '*') {
+    const h = parseInt(hour, 10);
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `Daily ${display} ${suffix}`;
+  }
+  return expr;
+}
+
+function renderCronCard(job) {
+  const id = job.name;
+  const isSelected = state.cronSelected.has(id);
+  const schedule = humanizeSchedule(job.schedule.expr);
+
+  // Build requires badges
+  const reqBadges = [];
+  if (job.requires) {
+    for (const [kind, items] of Object.entries(job.requires)) {
+      const prefix = kind === 'skills' ? 'skill' : 'script';
+      for (const item of items) reqBadges.push(`${prefix}: ${item}`);
+    }
+  }
+
+  // Build config view: clone job, truncate payload.message, strip requires
+  const configView = JSON.parse(JSON.stringify(job));
+  const firstLine = (configView.payload.message || '').split('\n')[0];
+  configView.payload.message = firstLine + (job.payload.message.includes('\n') ? ' ...' : '');
+  delete configView.requires;
+
+  const card = document.createElement('div');
+  card.className = 'bg-card rounded-lg border border-gray-800 hover:border-gray-700 transition-colors';
+  card.id = `cron-${id}`;
+
+  card.innerHTML = `
+    <div class="p-4 cursor-pointer select-none" onclick="toggleExpand('cron-${id}')">
+      <div class="flex items-start gap-3">
+        <input type="checkbox" class="mt-1 accent-accent w-4 h-4 cursor-pointer rounded"
+               ${isSelected ? 'checked' : ''}
+               onclick="event.stopPropagation(); toggleCronSelect('${id}')" />
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="font-medium text-white text-sm">${humanize(id)}</h3>
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-mono badge-schedule">${schedule}</span>
+          </div>
+          <p class="text-gray-400 text-sm mt-1">${escapeHtml(job.description)}</p>
+          ${reqBadges.length ? `
+            <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+              ${reqBadges.map(r => `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-gray-800 text-gray-400 border border-gray-700">${r}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+        <svg id="chevron-cron-${id}" class="w-4 h-4 text-gray-500 transition-transform flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+    </div>
+    <div id="detail-cron-${id}" class="card-expand">
+      <div class="px-4 pb-4 border-t border-gray-800 pt-3">
+        <div class="mb-3">
+          <span class="text-xs text-gray-500 uppercase tracking-wide">Prompt</span>
+          <div class="mt-1 rounded bg-[#0c1929] border border-[#1e3a5f] p-3 text-xs text-gray-300 overflow-x-auto leading-relaxed" style="white-space:pre-wrap;">${escapeHtml(job.payload.message)}</div>
+        </div>
+        <div>
+          <span class="text-xs text-gray-500 uppercase tracking-wide">Config</span>
+          <pre class="text-xs mt-1 overflow-x-auto leading-relaxed">${syntaxHighlight(configView)}</pre>
+        </div>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+function renderAllCronJobs() {
+  const grid = document.getElementById('cron-grid');
+  grid.innerHTML = '';
+  for (const job of state.cronJobs) {
+    grid.appendChild(renderCronCard(job));
+  }
+}
+
+function toggleCronSelect(id) {
+  if (state.cronSelected.has(id)) {
+    state.cronSelected.delete(id);
+  } else {
+    state.cronSelected.add(id);
+  }
+  const card = document.getElementById(`cron-${id}`);
+  if (card) {
+    const cb = card.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = state.cronSelected.has(id);
+  }
+  updateDownloadBar();
+}
+
+function selectAllCron() {
+  for (const j of state.cronJobs) state.cronSelected.add(j.name);
+  for (const j of state.cronJobs) {
+    const card = document.getElementById(`cron-${j.name}`);
+    if (card) { const cb = card.querySelector('input[type="checkbox"]'); if (cb) cb.checked = true; }
+  }
+  updateDownloadBar();
+}
+
+function deselectAllCron() {
+  state.cronSelected.clear();
+  for (const j of state.cronJobs) {
+    const card = document.getElementById(`cron-${j.name}`);
+    if (card) { const cb = card.querySelector('input[type="checkbox"]'); if (cb) cb.checked = false; }
+  }
+  updateDownloadBar();
+}
+
+function applyCronSettings() {
+  const tz = document.getElementById('cron-tz').value;
+  const delivery = document.querySelector('input[name="cron-delivery"]:checked').value;
+  const channelInput = document.getElementById('cron-channel-id');
+  const channelId = channelInput.value.trim();
+  const model = document.getElementById('cron-model').value.trim();
+
+  // Show/hide channel ID input
+  channelInput.classList.toggle('hidden', delivery === 'none');
+
+  for (const job of state.cronJobs) {
+    // Timezone
+    job.schedule.tz = tz;
+
+    // Model
+    if (model) {
+      job.payload.model = model;
+    } else {
+      delete job.payload.model;
+    }
+
+    // Delivery (only for alert-capable jobs)
+    if (ALERT_JOBS.has(job.name)) {
+      if (delivery !== 'none' && channelId) {
+        job.delivery = { mode: 'announce', channel: delivery, to: channelId };
+      } else {
+        job.delivery = { mode: 'none' };
+      }
+    }
+  }
+
+  renderAllCronJobs();
+}
+
+// ── Init ──
+async function init() {
+  const loadingEl = document.getElementById('loading');
+
+  try {
+    const ids = await loadCatalog();
+    if (!ids.length) {
+      loadingEl.textContent = 'No patches found.';
+      return;
+    }
+
+    // Load all patches in parallel
+    const patchPromises = ids.map(id => loadPatch(id).catch(err => {
+      console.error(`Failed to load patch ${id}:`, err);
+      return null;
+    }));
+    const patches = (await Promise.all(patchPromises)).filter(Boolean);
+    state.patches = patches;
+
+    // Load all config files in parallel
+    const configPromises = [];
+    for (const patch of patches) {
+      for (let i = 0; i < patch.steps.length; i++) {
+        const step = patch.steps[i];
+        if (step.merge_file) {
+          const key = patch.id + '-' + i;
+          configPromises.push(
+            loadConfig(step.merge_file).then(data => {
+              if (data) state.configs[key] = data;
+            }).catch(() => {})
+          );
+        }
+      }
+    }
+    await Promise.all(configPromises);
+
+    loadingEl.remove();
+    renderAllPatches();
+  } catch (err) {
+    loadingEl.textContent = 'Error loading patches: ' + err.message;
+    console.error(err);
+  }
+
+  // Load cron jobs
+  const cronLoadingEl = document.getElementById('cron-loading');
+  try {
+    const cronIds = await loadCronCatalog();
+    if (!cronIds.length) {
+      cronLoadingEl.textContent = 'No cron jobs found.';
+      return;
+    }
+    const cronPromises = cronIds.map(id => loadCronJob(id).catch(err => {
+      console.error(`Failed to load cron job ${id}:`, err);
+      return null;
+    }));
+    state.cronJobs = (await Promise.all(cronPromises)).filter(Boolean);
+    cronLoadingEl.remove();
+    renderAllCronJobs();
+  } catch (err) {
+    cronLoadingEl.textContent = 'Error loading cron jobs: ' + err.message;
+    console.error(err);
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

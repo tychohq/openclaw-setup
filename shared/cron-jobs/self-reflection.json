@@ -2,6 +2,7 @@
   "name": "self-reflection",
   "description": "Hourly reflection on recent sessions. Extracts lessons learned and writes them to workspace files.",
   "enabled": true,
+  "requires": {"skills": ["self-reflection"]},
   "schedule": {
     "kind": "cron",
     "expr": "0 * * * *",
@@ -11,7 +12,6 @@
   "payload": {
     "kind": "agentTurn",
     "message": "You are a self-reflection agent. Follow these steps:\n\n1. Check for active sessions worth reflecting on:\n```bash\nopenclaw sessions --active 60 --json 2>/dev/null | jq '[.sessions[] | select(.key | (contains(\"subagent\") or contains(\"cron:\")) | not) | select(.outputTokens > 50)] | length'\n```\n\n2. If the result is 0, reply: SKIP\n\n3. If > 0, read the skill file:\n   Read file: ~/.openclaw/skills/self-reflection/SKILL.md\n\n4. Follow the skill instructions exactly. Extract insights from sessions active in the last hour and write them to the appropriate workspace files.\n\nKeep it tight. Do not manufacture insights. Do NOT spawn sub-agents — do the work directly in this session.",
-    "model": "anthropic/claude-sonnet-4-20250514",
     "timeoutSeconds": 300
   },
   "delivery": {
