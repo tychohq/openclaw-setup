@@ -63,6 +63,44 @@ yaml_get_targets() {
   local file="$1"
   grep -E "^targets:" "$file" 2>/dev/null | head -1 | sed -E 's/^targets:[[:space:]]*\[//;s/\][[:space:]]*$//' | tr ',' '\n' | sed -E 's/^[[:space:]]*["'"'"']?//;s/["'"'"']?[[:space:]]*$//' | tr '\n' ' '
 }
+# Extract the requires array as newline-separated values
+yaml_get_requires() {
+  local file="$1"
+  local in_requires=false
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^requires: ]]; then
+      in_requires=true
+      continue
+    fi
+    if $in_requires; then
+      if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+(.*) ]]; then
+        local val="${BASH_REMATCH[1]}"
+        echo "$val" | sed -E "s/^[\"']|[\"']$//g"
+      else
+        break
+      fi
+    fi
+  done < "$file"
+}
+
+# Check that all required env vars are set; returns missing var names on failure
+check_requires() {
+  local patch_file="$1"
+  local missing=()
+  while IFS= read -r var; do
+    [[ -z "$var" ]] && continue
+    if [[ -z "${!var:-}" ]]; then
+      missing+=("$var")
+    fi
+  done < <(yaml_get_requires "$patch_file")
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    printf '%s\n' "${missing[@]}"
+    return 1
+  fi
+  return 0
+}
+
 
 # Check if a deployment matches the targets list
 matches_target() {
@@ -142,7 +180,7 @@ exec_step() {
     mkdir)           exec_step_mkdir "$step_file" ;;
     openclaw_update) exec_step_openclaw_update "$step_file" ;;
     restart)         exec_step_restart ;;
-    *)               warn "Unknown step type: $step_type (skipping)" ;;
+    *)               die "Unknown step type: $step_type — check for typos in patch manifest" ;;
   esac
 }
 
@@ -218,11 +256,19 @@ exec_step_config_patch() {
 
     local tmp
     tmp=$(mktemp)
-    jq -s '.[0] * .[1]' "$config_file" "$source" > "$tmp"
+    if ! jq -s '.[0] * .[1]' "$config_file" "$source" > "$tmp"; then
+      rm -f "$tmp"
+      die "jq merge failed for $merge_json_file — check that openclaw.json is valid JSON (not JSON5)"
+    fi
+    # Sanity check: ensure output is non-empty valid JSON
+    if ! jq empty "$tmp" 2>/dev/null; then
+      rm -f "$tmp"
+      die "jq produced invalid output when merging $merge_json_file"
+    fi
     mv "$tmp" "$config_file"
     info "Config patched from $merge_json_file"
   else
-    warn "config_patch step without merge_file — use a JSON file in files/"
+    die "config_patch step requires merge_file — use a JSON file in files/"
   fi
 }
 
@@ -485,6 +531,9 @@ description: ""
 targets: ["*"]
 created: $now
 
+# requires:
+#   - EXAMPLE_ENV_VAR
+
 steps:
   # - type: file
   #   path: ~/.openclaw/workspace/EXAMPLE.md
@@ -545,7 +594,10 @@ cmd_list() {
     fi
     
     printf "  %-30s %s%s\n" "$id" "$desc" "$applied_marker"
+    local requires_str
+    requires_str="$(yaml_get_requires "$f" | tr '\n' ', ' | sed 's/, $//')"
     printf "    created: %s  targets: [%s]\n" "$created" "$targets_str"
+    [[ -n "$requires_str" ]] && printf "    requires: %s\n" "$requires_str"
     echo ""
     count=$((count + 1))
   done < <(get_sorted_patches)
@@ -558,6 +610,9 @@ cmd_validate() {
   local files=()
   
   if [[ -n "$target" ]]; then
+    if [[ ! -f "$PATCHES_DIR/$target.yaml" && ! -f "$PATCHES_DIR/$target.yml" ]]; then
+      die "Patch not found: $target (looked for $PATCHES_DIR/$target.yaml and .yml)"
+    fi
     files=("$PATCHES_DIR/$target.yaml" "$PATCHES_DIR/$target.yml")
   else
     for f in "$PATCHES_DIR"/*.yaml "$PATCHES_DIR"/*.yml; do
@@ -606,7 +661,10 @@ cmd_validate() {
         config_patch)
           local mf
           mf="$(yaml_get "$step" "merge_file")"
-          if [[ -n "$mf" && ! -f "$FILES_DIR/$mf" ]]; then
+          if [[ -z "$mf" ]]; then
+            warn "$id: config_patch step missing required 'merge_file'"
+            errors=$((errors + 1))
+          elif [[ ! -f "$FILES_DIR/$mf" ]]; then
             warn "$id: merge_file not found: files/$mf"
             errors=$((errors + 1))
           fi
@@ -628,6 +686,13 @@ cmd_validate() {
             warn "$id: skill directory not found: skills/${sd:-$sn}"
             errors=$((errors + 1))
           fi
+          ;;
+        file|config_set|plugin_enable|clawhub|cron|exec|mkdir|openclaw_update|restart)
+          # Known types — no extra validation needed here
+          ;;
+        *)
+          warn "$id: unknown step type: $stype"
+          errors=$((errors + 1))
           ;;
       esac
     done
@@ -693,6 +758,7 @@ cmd_apply() {
   
   local applied=0
   local skipped=0
+  local skipped_requires=0
   local failed=0
   
   while IFS= read -r patch_file; do
@@ -714,6 +780,17 @@ cmd_apply() {
     read -ra targets <<< "$targets_raw"
     
     if ! matches_target "$deployment" "${targets[@]}"; then
+      continue
+    fi
+
+    # Check required env vars
+    local missing_vars
+    if ! missing_vars="$(check_requires "$patch_file")"; then
+      warn "Skipping $id — missing env vars:"
+      while IFS= read -r mv; do
+        warn "  - $mv"
+      done <<< "$missing_vars"
+      skipped_requires=$((skipped_requires + 1))
       continue
     fi
     
@@ -756,7 +833,7 @@ cmd_apply() {
   done < <(get_sorted_patches)
   
   echo ""
-  echo "Summary: $applied applied, $skipped already applied, $failed failed"
+  echo "Summary: $applied applied, $skipped already applied, $skipped_requires skipped (missing env), $failed failed"
 }
 
 cmd_status() {
@@ -796,11 +873,16 @@ cmd_status() {
       continue
     fi
     
+    local req_str
+    req_str="$(yaml_get_requires "$patch_file" | tr '\n' ', ' | sed 's/, $//')"
+    local req_display=""
+    [[ -n "$req_str" ]] && req_display="  [needs: $req_str]"
+
     if is_applied "$id"; then
       printf "  ✓ %-30s %s\n" "$id" "$desc"
       applied=$((applied + 1))
     else
-      printf "  ○ %-30s %s\n" "$id" "$desc"
+      printf "  ○ %-30s %s%s\n" "$id" "$desc" "$req_display"
       pending=$((pending + 1))
     fi
   done < <(get_sorted_patches)

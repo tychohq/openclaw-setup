@@ -2,7 +2,7 @@
   "channels": {
     "telegram": {
       "enabled": true,
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "streaming": "off"
     }

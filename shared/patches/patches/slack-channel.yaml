@@ -1,7 +1,12 @@
 id: slack-channel
-description: "Slack plugin + channel settings (stub — not yet in production). Requires SLACK_BOT_TOKEN."
+description: "Slack plugin + channel settings (DM + group allowlist, no streaming)"
 targets: ["*"]
 created: 2026-03-01T22:08:00Z
+
+requires:
+  - SLACK_BOT_TOKEN
+  - SLACK_APP_TOKEN
+  - SLACK_OWNER_USER_ID
 
 steps:
   - type: plugin_enable

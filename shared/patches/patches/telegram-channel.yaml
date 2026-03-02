@@ -1,7 +1,11 @@
 id: telegram-channel
-description: "Telegram plugin + channel settings (allowlist, no streaming, DM pairing). Requires TELEGRAM_BOT_TOKEN."
+description: "Telegram plugin + channel settings (allowlist, no streaming, DM allowlist)"
 targets: ["*"]
 created: 2026-03-01T22:06:00Z
+
+requires:
+  - TELEGRAM_BOT_TOKEN
+  - TELEGRAM_OWNER_ID
 
 steps:
   - type: plugin_enable

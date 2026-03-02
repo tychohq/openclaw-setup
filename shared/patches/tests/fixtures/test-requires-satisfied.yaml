@@ -1,0 +1,11 @@
+id: test-requires-satisfied
+description: "Test that satisfied requires allows apply"
+targets: ["*"]
+created: 2026-01-01T00:00:21Z
+
+requires:
+  - HOME
+
+steps:
+  - type: exec
+    command: "echo requires-ok > ~/.openclaw/requires-satisfied-marker.txt"

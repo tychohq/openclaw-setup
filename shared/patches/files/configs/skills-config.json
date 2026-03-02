@@ -13,7 +13,7 @@
     ],
     "load": {
       "extraDirs": [
-        "~/.Agents/skills"
+        "~/.agents/skills"
       ]
     },
     "install": {

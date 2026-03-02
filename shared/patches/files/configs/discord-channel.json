@@ -4,7 +4,7 @@
       "enabled": true,
       "groupPolicy": "allowlist",
       "streaming": "off",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "threadBindings": {
         "enabled": true,
         "spawnAcpSessions": true

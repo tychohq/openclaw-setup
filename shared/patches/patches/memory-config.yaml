@@ -1,7 +1,10 @@
 id: memory-config
-description: "Memory backend, vector search, session memory hooks. Requires OPENAI_API_KEY."
+description: "Memory backend, vector search, session memory hooks"
 targets: ["*"]
 created: 2026-03-01T22:01:00Z
+
+requires:
+  - OPENAI_API_KEY
 
 steps:
   - type: config_patch

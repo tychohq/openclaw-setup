@@ -100,6 +100,25 @@ Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operat
 - Requires `openclaw.json` to exist (`openclaw onboard` creates it).
 - Never include secrets (API keys, tokens). Those stay in `.env`.
 
+## 3b. `plugin_enable` — Enable a plugin
+
+Enables an OpenClaw plugin by id via `openclaw plugins enable`.
+
+```yaml
+- type: plugin_enable
+  plugin: discord
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `plugin` | yes | Plugin identifier (e.g. `discord`, `telegram`, `slack`, `signal`). |
+
+**Rules:**
+- Requires `openclaw` CLI on the instance.
+- Idempotent — enabling an already-enabled plugin is a no-op.
+
 ---
 
 ## 4. `mkdir` — Create directories

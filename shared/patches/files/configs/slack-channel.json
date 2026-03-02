@@ -2,7 +2,7 @@
   "channels": {
     "slack": {
       "enabled": true,
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "streaming": "off"
     }

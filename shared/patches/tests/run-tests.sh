@@ -352,6 +352,43 @@ YAML
   teardown
 }
 
+test_requires_blocks_missing_vars() {
+  setup
+  load_patch test-requires-missing.yaml
+  local output
+  output="$(apply test-instance 2>&1)"
+  [[ ! -f "$TEST_HOME/requires-marker.txt" ]]
+  echo "$output" | grep -q "skipped (missing env)"
+  teardown
+}
+
+test_requires_allows_satisfied_vars() {
+  setup
+  load_patch test-requires-satisfied.yaml
+  apply test-instance >/dev/null
+  [[ -f "$TEST_HOME/requires-satisfied-marker.txt" ]]
+  grep -q "requires-ok" "$TEST_HOME/requires-satisfied-marker.txt"
+  teardown
+}
+
+test_plugin_enable_step() {
+  setup
+  setup_mock_openclaw
+  cat > "$TEST_PATCHES/patches/plugin-enable-test.yaml" << YAML
+id: plugin-enable-test
+description: "Test plugin_enable step"
+targets: ["*"]
+created: 2026-01-01T00:00:22Z
+
+steps:
+  - type: plugin_enable
+    plugin: discord
+YAML
+  apply test-instance >/dev/null
+  grep -q "plugins enable discord" "$TEST_HOME/mock-openclaw-calls.txt"
+  teardown
+}
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 
 echo "openclaw-patch test suite"
@@ -381,6 +418,9 @@ run_test "chronological ordering"         test_chronological_ordering
 run_test "validate with no patches"       test_validate_no_patches
 run_test "list shows empty"               test_list_empty
 run_test "2-space indent parsing"         test_two_space_indent
+run_test "requires blocks missing vars"   test_requires_blocks_missing_vars
+run_test "requires allows satisfied vars" test_requires_allows_satisfied_vars
+run_test "plugin_enable step"             test_plugin_enable_step
 
 echo ""
 echo "Results: $PASS/$TOTAL passed, $FAIL failed"

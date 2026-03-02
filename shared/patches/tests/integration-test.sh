@@ -36,6 +36,20 @@ ok "Baseline config created: $(wc -l < "$CONFIG") lines"
 jq empty "$CONFIG" || die "Baseline config is not valid JSON"
 ok "Baseline config is valid JSON"
 
+# ── Step 1.5: Set dummy env vars ──
+info "Setting dummy env vars for requires gates"
+export ANTHROPIC_API_KEY="test-dummy"
+export OPENAI_API_KEY="test-dummy"
+export DISCORD_TOKEN="test-dummy"
+export DISCORD_OWNER_ID="test-dummy"
+export DISCORD_GUILD_ID="test-dummy"
+export TELEGRAM_BOT_TOKEN="test-dummy"
+export TELEGRAM_OWNER_ID="test-dummy"
+export SIGNAL_PHONE_NUMBER="test-dummy"
+export SLACK_BOT_TOKEN="test-dummy"
+export SLACK_APP_TOKEN="test-dummy"
+export SLACK_OWNER_USER_ID="test-dummy"
+
 # ── Step 2: Apply all patches ──
 info "Applying all patches with deployment=$DEPLOYMENT"
 OPENCLAW_HOME="$PROFILE_DIR" OPENCLAW_PATCHES_DIR="$REPO_ROOT" \
@@ -111,6 +125,15 @@ info "Re-applying patches (idempotency check)..."
 OPENCLAW_HOME="$PROFILE_DIR" OPENCLAW_PATCHES_DIR="$REPO_ROOT" \
   bash "$PATCH_CLI" apply -d "$DEPLOYMENT" 2>&1 | tail -1
 ok "Idempotency: re-apply completed"
+
+# ── Step 5: Requires gate test ──
+info "Testing requires gate (graceful skip)..."
+unset ANTHROPIC_API_KEY
+echo "{}" > "$PROFILE_DIR/patches/applied.json"
+REQ_OUTPUT="$(OPENCLAW_HOME="$PROFILE_DIR" OPENCLAW_PATCHES_DIR="$REPO_ROOT" bash "$PATCH_CLI" apply -d "$DEPLOYMENT" 2>&1)"
+echo "$REQ_OUTPUT" | grep -q "skipped (missing env)" || die "Requires gate did not produce skip summary"
+echo "$REQ_OUTPUT" | grep -qi "skipping model-providers" || die "model-providers was not skipped"
+ok "Requires gate: graceful skip confirmed"
 
 # ── Summary ──
 echo ""

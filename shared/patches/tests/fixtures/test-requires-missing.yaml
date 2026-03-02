@@ -1,0 +1,11 @@
+id: test-requires-missing
+description: "Test that missing requires skips the patch"
+targets: ["*"]
+created: 2026-01-01T00:00:20Z
+
+requires:
+  - TOTALLY_FAKE_ENV_VAR_XYZZY
+
+steps:
+  - type: exec
+    command: "echo should-not-run > ~/.openclaw/requires-marker.txt"

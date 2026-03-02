@@ -1,7 +1,10 @@
 id: signal-channel
-description: "Signal channel settings (allowlist, DM pairing). Requires signal-cli and account phone number."
+description: "Signal channel settings (DM + group allowlist)"
 targets: ["*"]
 created: 2026-03-01T22:07:00Z
+
+requires:
+  - SIGNAL_PHONE_NUMBER
 
 steps:
   - type: plugin_enable

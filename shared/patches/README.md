@@ -24,7 +24,7 @@ vim patches/update-default-model.yaml
 
 ## Patch Format
 
-Patches are YAML manifests in `patches/`. Each patch has an ID, optional target filter, and a list of steps:
+Patches are YAML manifests in `patches/`. Each patch has an ID, optional target filter, required env vars, and a list of steps:
 
 ```yaml
 id: update-default-model
@@ -32,21 +32,45 @@ description: "Switch default model to claude-sonnet-4"
 targets: ["*"]  # or ["opensesame", "mac-mini"]
 created: 2026-02-27T10:00:00Z
 
+requires:        # env vars that must be set before applying
+  - ANTHROPIC_API_KEY
+
 steps:
   - type: config_patch
-    merge:
-      models:
-        default: "anthropic/claude-sonnet-4-20250514"
+    merge_file: configs/update-models.json  # JSON file in files/
 
   - type: restart
 ```
+
+Where `files/configs/update-models.json` contains:
+```json
+{
+  "models": {
+    "default": "anthropic/claude-sonnet-4-20250514"
+  }
+}
+```
+
+## Manifest Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | yes | Unique patch identifier |
+| `description` | yes | Human-readable description |
+| `targets` | yes | Deployment filter (`["*"]` = all) |
+| `created` | yes | ISO-8601 timestamp (determines apply order) |
+| `requires` | no | List of env vars that must be set for this patch to be operational. These are runtime dependencies (e.g. tokens, owner IDs) — the apply script checks they exist before running steps and fails fast if any are missing. The vars may be consumed by OpenClaw at runtime rather than interpolated into the patch JSON directly. |
+| `steps` | yes | Ordered list of steps to execute |
 
 ## Step Types
 
 | Type | Description |
 |------|-------------|
 | `file` | Write a file to a path on the instance |
-| `config_patch` | Deep-merge into `openclaw.json` |
+| `config_patch` | Deep-merge into `openclaw.json` (requires `merge_file`) |
+| `config_set` | Set a single config field via CLI |
+| `plugin_enable` | Enable an OpenClaw plugin by id |
+| `mkdir` | Create directories |
 | `skill` | Copy a skill directory to `~/.openclaw/skills/` |
 | `clawhub` | Install/update ClawHub skills |
 | `cron` | Create or update a cron job |
@@ -63,6 +87,7 @@ See [docs/step-reference.md](docs/step-reference.md) for full details.
 3. **State** is tracked in `~/.openclaw/patches/applied.json` on each instance
 4. Patches are applied in chronological order (by `created` timestamp)
 5. Already-applied patches are skipped (idempotent)
+6. `requires` are checked before any steps run — missing vars = immediate failure with instructions
 
 ## Instance Setup
 

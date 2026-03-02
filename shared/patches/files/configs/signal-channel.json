@@ -2,7 +2,7 @@
   "channels": {
     "signal": {
       "enabled": true,
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist"
     }
   }

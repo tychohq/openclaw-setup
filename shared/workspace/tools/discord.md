@@ -8,7 +8,7 @@
 
 ## Key Settings
 - `requireMention: false` — bot responds to all messages in allowed channels
-- `dmPolicy: "pairing"` — DMs require device pairing
+- `dmPolicy: "allowlist"` — DMs restricted to allowlist (owner ID set during setup)
 - `ackReactionScope: "all"` — bot reacts to acknowledge messages
 
 ## Platform Formatting

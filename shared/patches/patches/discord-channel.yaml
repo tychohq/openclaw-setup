@@ -1,7 +1,12 @@
 id: discord-channel
-description: "Discord plugin + channel settings (allowlist, no streaming, DM pairing, thread bindings). Requires DISCORD_TOKEN."
+description: "Discord plugin + channel settings (DM + group allowlist, no streaming, thread bindings)"
 targets: ["*"]
 created: 2026-03-01T22:05:00Z
+
+requires:
+  - DISCORD_TOKEN
+  - DISCORD_OWNER_ID
+  - DISCORD_GUILD_ID
 
 steps:
   - type: plugin_enable

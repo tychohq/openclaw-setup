@@ -29,7 +29,7 @@ In `~/.openclaw/openclaw.json`, set:
       "enabled": true,
       "token": "paste-bot-token-here",
       "groupPolicy": "allowlist",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "requireMention": false,
       "allowFrom": ["your-user-id"],
       "guilds": {

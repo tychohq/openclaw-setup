@@ -128,7 +128,7 @@
       "enabled": true,
       "token": "${DISCORD_TOKEN}",
       "groupPolicy": "allowlist",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "requireMention": false,
       "allowFrom": [
         "YOUR_DISCORD_USER_ID"
@@ -143,7 +143,7 @@
     "telegram": {
       "enabled": false,
       "botToken": "",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "allowFrom": [],
       "groups": {}
@@ -154,7 +154,7 @@
       "mode": "socket",
       "appToken": "",
       "botToken": "",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "allowFrom": [],
       "channels": {}

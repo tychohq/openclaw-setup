@@ -4,6 +4,8 @@ Your `openclaw.json` is the brain of your setup. It controls which models you us
 
 The config lives at `~/.openclaw/openclaw.json` and uses JSON5 syntax (comments and trailing commas allowed).
 
+> **⚠️ Patch system compatibility:** The `openclaw-patch` tool uses `jq` for config merges, which requires **strict JSON** (no comments, no trailing commas). If you use `openclaw-patch`, keep your `openclaw.json` as valid strict JSON. The `openclaw` CLI and gateway handle JSON5, but external tooling may not.
+
 > **New to OpenClaw?** Run `openclaw onboard` first — the wizard handles auth and basic config. Then come back here to fine-tune everything.
 
 ---
@@ -463,7 +465,7 @@ This is probably the most involved section. See `telegram-setup-guide.md` for th
     "telegram": {
       "enabled": true,
       "botToken": "<YOUR_BOT_TOKEN>",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "allowFrom": ["<YOUR_TELEGRAM_USER_ID>"],
       "groups": {
@@ -494,7 +496,7 @@ This is probably the most involved section. See `telegram-setup-guide.md` for th
 | Field | What It Does |
 |-------|-------------|
 | `botToken` | Your Telegram bot token from @BotFather |
-| `dmPolicy` | `"pairing"` = require approval code for new DM conversations. Safest option. |
+| `dmPolicy` | `"allowlist"` = only IDs in `allowFrom` can DM. Set owner ID during setup. Non-interactive friendly. |
 | `groupPolicy` | `"allowlist"` = only respond in groups you've explicitly configured |
 | `allowFrom` | Array of Telegram user IDs that can interact with the bot |
 | `requireMention` | `false` = respond to every message in the group (good for your main group where you're the only user). `true` = only respond when @mentioned. |
@@ -864,7 +866,7 @@ Copy this, fill in your values, and save as `~/.openclaw/openclaw.json`:
     "telegram": {
       "enabled": true,
       "botToken": "<YOUR_BOT_TOKEN>",
-      "dmPolicy": "pairing",
+      "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "allowFrom": ["<YOUR_TELEGRAM_USER_ID>"],
       "groups": {
