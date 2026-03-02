@@ -33,3 +33,6 @@ tmp-default-config.json
 
 # Discord channel mapping for stop hook notifications
 .discord-channel
+
+# Generated backend config (S3 state)
+backend.tf

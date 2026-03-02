@@ -83,6 +83,40 @@ Great for CI, scripting, or re-deploys where your `.env` is already populated.
 ./setup.sh --auto
 ```
 
+## Terraform State (S3 Backend)
+
+By default, `setup.sh` stores Terraform state in S3 with DynamoDB locking. This means:
+
+- **State is safe** — not lost if you delete the repo or switch machines
+- **Locking** — prevents concurrent `terraform apply` from corrupting state
+- **Versioned** — S3 versioning enabled for rollback if state gets corrupted
+
+### How It Works
+
+The setup wizard automatically:
+
+1. Creates an S3 bucket: `{deployment-name}-tfstate-{aws-account-id}`
+2. Creates a DynamoDB table: `{deployment-name}-tfstate-lock`
+3. Generates `backend.tf` (gitignored) with the S3 backend config
+4. Migrates any existing local state to S3
+
+### Cost
+
+Effectively free — a few KB of S3 storage + occasional DynamoDB reads for locking.
+
+### Opt Out
+
+To use local state instead (not recommended):
+
+```bash
+# In your .env
+TFSTATE_S3="false"
+```
+
+### Existing Deployments
+
+If you have an existing deployment with local state, just re-run `setup.sh`. It will detect the local `terraform.tfstate` and migrate it to S3 automatically.
+
 ---
 
 ## Advanced Deployment
