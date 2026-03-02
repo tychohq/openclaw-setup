@@ -87,28 +87,138 @@ else
   log "No GOOGLE_OAUTH_CREDENTIALS_B64 in .env — skipping Google credentials."
 fi
 
-# ── 4. Decode config bundle → openclaw.json ──────────────────────────────────
+# ── 4. Base config + config bundle (handled in step 4b below) ────────────────
 
-log "Step 4: Config bundle..."
+log "Step 4: Config generation deferred to step 4b..."
 
-CONFIG_BUNDLE_B64="$(env_get CONFIG_BUNDLE_B64)"
+# ── 4b. Generate base openclaw.json from .env vars ───────────────────────────
 
-if [ -n "$CONFIG_BUNDLE_B64" ]; then
-  mkdir -p "$OPENCLAW_DIR"
-  if [ -f "$OPENCLAW_DIR/openclaw.json" ]; then
-    # Merge: existing config preserved, bundle overlaid
-    BUNDLE_FILE=$(mktemp)
-    echo "$CONFIG_BUNDLE_B64" | base64 -d > "$BUNDLE_FILE"
-    MERGED=$(jq -s '.[0] * .[1]' "$OPENCLAW_DIR/openclaw.json" "$BUNDLE_FILE")
-    echo "$MERGED" > "$OPENCLAW_DIR/openclaw.json"
-    rm -f "$BUNDLE_FILE"
-    log "Config bundle merged into existing openclaw.json."
-  else
-    echo "$CONFIG_BUNDLE_B64" | base64 -d > "$OPENCLAW_DIR/openclaw.json"
-    log "Config bundle decoded to openclaw.json."
-  fi
+log "Step 4b: Generating base openclaw.json from .env..."
+
+OPENCLAW_JSON="$OPENCLAW_DIR/openclaw.json"
+
+# If no config exists yet, generate from .env
+if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
+    GATEWAY_AUTH_TOKEN="$(env_get GATEWAY_AUTH_TOKEN)"
+    OWNER_NAME="$(env_get OWNER_NAME)"
+    ASSISTANT_NAME="$(env_get ASSISTANT_NAME)"
+
+    # Start with base gateway config
+    CONFIG=$(jq -n \
+      --arg token "${GATEWAY_AUTH_TOKEN:-}" \
+      '{
+        gateway: {
+          mode: "local",
+          auth: { token: $token },
+          port: 18789
+        }
+      }')
+
+    # Add Slack channel if configured
+    SLACK_BOT_TOKEN="$(env_get SLACK_BOT_TOKEN)"
+    SLACK_APP_TOKEN="$(env_get SLACK_APP_TOKEN)"
+    SLACK_OWNER_USER_ID="$(env_get SLACK_OWNER_USER_ID)"
+    if [ -n "$SLACK_BOT_TOKEN" ]; then
+        CONFIG=$(echo "$CONFIG" | jq \
+          --arg app_token "${SLACK_APP_TOKEN:-}" \
+          --arg bot_token "$SLACK_BOT_TOKEN" \
+          --arg owner_id "${SLACK_OWNER_USER_ID:-}" \
+          '.channels.slack = {
+            enabled: true,
+            mode: "socket",
+            appToken: $app_token,
+            botToken: $bot_token,
+            dmPolicy: "allowlist",
+            allowFrom: (if $owner_id != "" then [$owner_id] else [] end)
+          }')
+    fi
+
+    # Add Discord channel if configured
+    DISCORD_TOKEN="$(env_get DISCORD_TOKEN)"
+    [ -z "$DISCORD_TOKEN" ] && DISCORD_TOKEN="$(env_get DISCORD_BOT_TOKEN)"
+    DISCORD_GUILD_ID="$(env_get DISCORD_GUILD_ID)"
+    DISCORD_OWNER_ID="$(env_get DISCORD_OWNER_ID)"
+    if [ -n "$DISCORD_TOKEN" ]; then
+        CONFIG=$(echo "$CONFIG" | jq \
+          --arg token "$DISCORD_TOKEN" \
+          --arg guild_id "${DISCORD_GUILD_ID:-}" \
+          --arg owner_id "${DISCORD_OWNER_ID:-}" \
+          '.channels.discord = {
+            enabled: true,
+            botToken: $token,
+            guildId: $guild_id,
+            dmPolicy: "allowlist",
+            allowFrom: (if $owner_id != "" then [$owner_id] else [] end)
+          }')
+    fi
+
+    # Add Telegram channel if configured
+    TELEGRAM_BOT_TOKEN="$(env_get TELEGRAM_BOT_TOKEN)"
+    TELEGRAM_OWNER_ID="$(env_get TELEGRAM_OWNER_ID)"
+    if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+        CONFIG=$(echo "$CONFIG" | jq \
+          --arg token "$TELEGRAM_BOT_TOKEN" \
+          --arg owner_id "${TELEGRAM_OWNER_ID:-}" \
+          '.channels.telegram = {
+            enabled: true,
+            botToken: $token,
+            dmPolicy: "allowlist",
+            allowFrom: (if $owner_id != "" then [$owner_id] else [] end)
+          }')
+    fi
+
+    # Add owner name to agent config
+    if [ -n "$OWNER_NAME" ]; then
+        CONFIG=$(echo "$CONFIG" | jq --arg name "$OWNER_NAME" '.agents.defaults.user.name = $name')
+    fi
+
+    # Add assistant name
+    if [ -n "$ASSISTANT_NAME" ] && [ "$ASSISTANT_NAME" != "OpenClaw" ]; then
+        CONFIG=$(echo "$CONFIG" | jq --arg name "$ASSISTANT_NAME" '.agents.defaults.persona.name = $name')
+    fi
+
+    # Add Bedrock bearer token if configured
+    AWS_BEARER_TOKEN_BEDROCK="$(env_get AWS_BEARER_TOKEN_BEDROCK)"
+    if [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
+        CONFIG=$(echo "$CONFIG" | jq --arg token "$AWS_BEARER_TOKEN_BEDROCK" '.env.vars.AWS_BEARER_TOKEN_BEDROCK = $token')
+    fi
+
+    echo "$CONFIG" | jq . > "$OPENCLAW_JSON"
+    log "Generated openclaw.json with gateway + channel config."
 else
-  log "No CONFIG_BUNDLE_B64 in .env — skipping config bundle."
+    log "openclaw.json already exists — skipping base config generation."
+fi
+
+# Now merge config bundle on top (if present)
+CONFIG_BUNDLE_B64_VAL="$(env_get CONFIG_BUNDLE_B64)"
+if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
+    BUNDLE_FILE=$(mktemp)
+    echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d > "$BUNDLE_FILE"
+
+    # Extract patches from the bundle and apply them
+    PATCHES=$(jq '.patches // []' "$BUNDLE_FILE")
+    PATCH_COUNT=$(echo "$PATCHES" | jq 'length')
+
+    if [ "$PATCH_COUNT" -gt 0 ]; then
+        for i in $(seq 0 $((PATCH_COUNT - 1))); do
+            PATCH=$(echo "$PATCHES" | jq ".[$i].content // .[$i]")
+            CURRENT=$(cat "$OPENCLAW_JSON")
+            MERGED=$(echo -e "$CURRENT\n$PATCH" | jq -s '.[0] * .[1]')
+            echo "$MERGED" > "$OPENCLAW_JSON"
+        done
+        log "Applied $PATCH_COUNT config patches from bundle."
+    fi
+
+    # Handle bundled skills allowlist
+    BUNDLED_SKILLS=$(jq -r '.manifest.selectedBundledSkills // [] | .[]' "$BUNDLE_FILE" 2>/dev/null)
+    if [ -n "$BUNDLED_SKILLS" ]; then
+        SKILLS_JSON=$(echo "$BUNDLED_SKILLS" | jq -R . | jq -s .)
+        CURRENT=$(cat "$OPENCLAW_JSON")
+        echo "$CURRENT" | jq --argjson skills "$SKILLS_JSON" '.skills.allowBundled = $skills' > "$OPENCLAW_JSON"
+        log "Set bundled skills allowlist: $(echo "$BUNDLED_SKILLS" | tr '\n' ', ')"
+    fi
+
+    rm -f "$BUNDLE_FILE"
 fi
 
 # ── 5. Run bootstrap-openclaw-workspace.sh ───────────────────────────────────
