@@ -172,10 +172,17 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
           }')
     fi
 
-    # Add Bedrock bearer token if configured
+    # Add Bedrock bearer token and model config if configured
     AWS_BEARER_TOKEN_BEDROCK="$(env_get AWS_BEARER_TOKEN_BEDROCK)"
+    ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
     if [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg token "$AWS_BEARER_TOKEN_BEDROCK" '.env.vars.AWS_BEARER_TOKEN_BEDROCK = $token')
+        # Enable Bedrock model discovery so OpenClaw finds Claude models via Bedrock
+        CONFIG=$(echo "$CONFIG" | jq '.models.bedrockDiscovery = { enabled: true }')
+        # If no direct Anthropic key, remove the empty value so OpenClaw uses Bedrock
+        if [ -z "$ANTHROPIC_API_KEY" ]; then
+            CONFIG=$(echo "$CONFIG" | jq 'del(.env.vars.ANTHROPIC_API_KEY)')
+        fi
     fi
 
     echo "$CONFIG" | jq . > "$OPENCLAW_JSON"
