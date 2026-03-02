@@ -206,6 +206,9 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg m "$DEFAULT_MODEL" '.agents.defaults.model = $m')
     fi
 
+    # Always add custom skills directory so ~/.openclaw/skills/ is discoverable
+    CONFIG=$(echo "$CONFIG" | jq '.skills.load.extraDirs = ["~/.openclaw/skills"]')
+
     echo "$CONFIG" | jq . > "$OPENCLAW_JSON"
     log "Generated openclaw.json with gateway + channel config."
 else
@@ -251,7 +254,24 @@ log "Step 5: Bootstrapping workspace..."
 BOOTSTRAP="$REPO_DIR/shared/scripts/bootstrap-openclaw-workspace.sh"
 
 if [ -x "$BOOTSTRAP" ] || [ -f "$BOOTSTRAP" ]; then
-  bash "$BOOTSTRAP" --skip-cron --skip-skills
+  bash "$BOOTSTRAP" --skip-cron --skip-skills --skip-bootstrap
+
+  # Remove the Bootstrap section from AGENTS.md (not relevant for cloud deploys —
+  # first-boot skill handles onboarding via chat instead)
+  AGENTS_FILE="$OPENCLAW_DIR/workspace/AGENTS.md"
+  if [ -f "$AGENTS_FILE" ]; then
+    python3 -c "
+import re
+with open('$AGENTS_FILE') as f:
+    text = f.read()
+# Remove the ## Bootstrap section (up to the next ## heading)
+text = re.sub(r'## Bootstrap\n.*?(?=\n## )', '', text, flags=re.DOTALL)
+with open('$AGENTS_FILE', 'w') as f:
+    f.write(text)
+"
+    log "Removed Bootstrap section from AGENTS.md (cloud deploy)."
+  fi
+
   log "Workspace bootstrap complete."
 else
   log "WARNING: bootstrap-openclaw-workspace.sh not found at $BOOTSTRAP"
