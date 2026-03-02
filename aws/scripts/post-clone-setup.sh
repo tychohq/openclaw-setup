@@ -172,17 +172,26 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
           }')
     fi
 
-    # Add Bedrock bearer token and model config if configured
+    # Add Bedrock bearer token if configured
     AWS_BEARER_TOKEN_BEDROCK="$(env_get AWS_BEARER_TOKEN_BEDROCK)"
-    ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
     if [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg token "$AWS_BEARER_TOKEN_BEDROCK" '.env.vars.AWS_BEARER_TOKEN_BEDROCK = $token')
-        # Enable Bedrock model discovery so OpenClaw finds Claude models via Bedrock
+    fi
+
+    # Set default model based on available API keys (first match wins)
+    ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
+    OPENAI_API_KEY="$(env_get OPENAI_API_KEY)"
+    DEFAULT_MODEL=""
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        DEFAULT_MODEL="anthropic/claude-sonnet-4-5"
+    elif [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
+        DEFAULT_MODEL="bedrock/anthropic.claude-sonnet-4-5-v2"
         CONFIG=$(echo "$CONFIG" | jq '.models.bedrockDiscovery = { enabled: true }')
-        # If no direct Anthropic key, remove the empty value so OpenClaw uses Bedrock
-        if [ -z "$ANTHROPIC_API_KEY" ]; then
-            CONFIG=$(echo "$CONFIG" | jq 'del(.env.vars.ANTHROPIC_API_KEY)')
-        fi
+    elif [ -n "$OPENAI_API_KEY" ]; then
+        DEFAULT_MODEL="openai/gpt-4.1"
+    fi
+    if [ -n "$DEFAULT_MODEL" ]; then
+        CONFIG=$(echo "$CONFIG" | jq --arg m "$DEFAULT_MODEL" '.agents.defaults.model = $m')
     fi
 
     echo "$CONFIG" | jq . > "$OPENCLAW_JSON"
