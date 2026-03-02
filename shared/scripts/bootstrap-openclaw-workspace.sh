@@ -20,14 +20,12 @@ WORKSPACE="$OPENCLAW_DIR/workspace"
 DRY_RUN=false
 SKIP_CRON=false
 SKIP_SKILLS=false
-SKIP_BOOTSTRAP=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)      DRY_RUN=true; shift ;;
     --skip-cron)    SKIP_CRON=true; shift ;;
     --skip-skills)  SKIP_SKILLS=true; shift ;;
-    --skip-bootstrap) SKIP_BOOTSTRAP=true; shift ;;
     -h|--help)
       echo "Usage: $0 [--dry-run] [--skip-cron] [--skip-skills]"
       exit 0 ;;
@@ -103,9 +101,7 @@ else
   done
 
   # Copy subdirectories (docs/, tools/, scripts/, templates/, bootstrap/)
-  SUBDIRS="docs tools scripts templates"
-  [ "$SKIP_BOOTSTRAP" = false ] && SUBDIRS="$SUBDIRS bootstrap"
-  for subdir in $SUBDIRS; do
+  for subdir in docs tools scripts templates bootstrap; do
     if [ -d "$WORKSPACE_SRC/$subdir" ]; then
       mkdir -p "$WORKSPACE/$subdir"
       for f in "$WORKSPACE_SRC/$subdir"/*; do

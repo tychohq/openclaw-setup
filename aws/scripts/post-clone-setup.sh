@@ -254,22 +254,13 @@ log "Step 5: Bootstrapping workspace..."
 BOOTSTRAP="$REPO_DIR/shared/scripts/bootstrap-openclaw-workspace.sh"
 
 if [ -x "$BOOTSTRAP" ] || [ -f "$BOOTSTRAP" ]; then
-  bash "$BOOTSTRAP" --skip-cron --skip-skills --skip-bootstrap
+  bash "$BOOTSTRAP" --skip-cron --skip-skills
 
-  # Remove the Bootstrap section from AGENTS.md (not relevant for cloud deploys —
-  # first-boot skill handles onboarding via chat instead)
-  AGENTS_FILE="$OPENCLAW_DIR/workspace/AGENTS.md"
-  if [ -f "$AGENTS_FILE" ]; then
-    python3 -c "
-import re
-with open('$AGENTS_FILE') as f:
-    text = f.read()
-# Remove the ## Bootstrap section (up to the next ## heading)
-text = re.sub(r'## Bootstrap\n.*?(?=\n## )', '', text, flags=re.DOTALL)
-with open('$AGENTS_FILE', 'w') as f:
-    f.write(text)
-"
-    log "Removed Bootstrap section from AGENTS.md (cloud deploy)."
+  # Overwrite Mac-specific bootstrap with cloud-appropriate version
+  CLOUD_BOOTSTRAP="$REPO_DIR/aws/workspace/bootstrap"
+  if [ -d "$CLOUD_BOOTSTRAP" ]; then
+    cp -f "$CLOUD_BOOTSTRAP"/* "$OPENCLAW_DIR/workspace/bootstrap/"
+    log "Replaced bootstrap/ with cloud-specific version."
   fi
 
   log "Workspace bootstrap complete."
