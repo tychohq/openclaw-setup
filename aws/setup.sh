@@ -123,7 +123,7 @@ if [ "$AUTO_MODE" = true ]; then
     MISSING=()
 
     # Required fields
-    [ -z "${DEPLOYMENT_NAME:-}" ] && MISSING+=("DEPLOYMENT_NAME  (e.g. my-openclaw)")
+    # DEPLOYMENT_NAME is auto-derived from OWNER_NAME + ASSISTANT_NAME (can override in .env)
     [ -z "${AWS_REGION:-}" ]      && MISSING+=("AWS_REGION       (e.g. us-east-1)")
 
     # Need at least one LLM provider
@@ -283,6 +283,11 @@ BACKEND_EOF
 
     echo ""
     echo -e "${GREEN}Infrastructure destroyed.${NC}"
+
+    # Clean up generated terraform files (they are regenerated each run)
+    rm -f backend.tf terraform.tfvars tfplan
+    rm -rf .terraform
+
     echo ""
     echo "To re-deploy:"
     echo "  ./setup.sh"
@@ -838,32 +843,9 @@ echo ""
 #═══════════════════════════════════════════════════════════════════════
 # STEP 4: Name Your Deployment
 #═══════════════════════════════════════════════════════════════════════
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}STEP 4/$TOTAL_STEPS: Name Your Deployment${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-if [ "$AUTO_MODE" = true ]; then
-    DEPLOYMENT_NAME="${DEPLOYMENT_NAME:-openclaw}"
-else
-    echo "Give this deployment a name. Used for AWS resource tags"
-    echo "and to distinguish multiple deployments."
-    echo ""
-    echo "Examples: my-openclaw, work-agent, home-assistant"
-    echo ""
-    ENV_DEFAULT="${DEPLOYMENT_NAME:-openclaw}"
-    read -p "Name [$ENV_DEFAULT]: " DEPLOYMENT_NAME_INPUT
-    DEPLOYMENT_NAME="${DEPLOYMENT_NAME_INPUT:-$ENV_DEFAULT}"
-fi
-
-# Validate deployment name
-if ! echo "$DEPLOYMENT_NAME" | grep -qE '^[a-z][a-z0-9-]{0,23}$'; then
-    echo -e "${RED}Error: Name must start with a letter, be lowercase alphanumeric/hyphens, max 24 chars.${NC}"
-    exit 1
-fi
-
-echo ""
-echo -e "Deployment name: ${GREEN}$DEPLOYMENT_NAME${NC}"
-echo ""
+# STEP 4: Deployment name — derived from OWNER_NAME + ASSISTANT_NAME after Step 5
+# (deferred below, after identity is collected)
+#═══════════════════════════════════════════════════════════════════════
 
 #═══════════════════════════════════════════════════════════════════════
 # STEP 5: Configure OpenClaw
@@ -1378,6 +1360,39 @@ fi
 #═══════════════════════════════════════════════════════════════════════
 # STEP 6: Check for Existing Resources
 #═══════════════════════════════════════════════════════════════════════
+# ── Derive deployment name (if not explicitly set) ────────────────────
+# Auto-derived from OWNER_NAME + ASSISTANT_NAME. Can be overridden via
+# DEPLOYMENT_NAME in .env for backward compatibility.
+if [ -z "${DEPLOYMENT_NAME:-}" ]; then
+    _owner_slug=$(slugify "${OWNER_NAME:-}")
+    _assistant_slug=$(slugify "${ASSISTANT_NAME:-openclaw}")
+
+    if [ -n "$_owner_slug" ] && [ -n "$_assistant_slug" ]; then
+        DEPLOYMENT_NAME="${_owner_slug}-${_assistant_slug}"
+    elif [ -n "$_owner_slug" ]; then
+        DEPLOYMENT_NAME="${_owner_slug}-openclaw"
+    elif [ -n "$_assistant_slug" ]; then
+        DEPLOYMENT_NAME="${_assistant_slug}"
+    else
+        DEPLOYMENT_NAME="openclaw"
+    fi
+fi
+
+# Truncate to 24 chars (AWS resource name limits)
+DEPLOYMENT_NAME="${DEPLOYMENT_NAME:0:24}"
+# Strip trailing hyphens from truncation
+DEPLOYMENT_NAME="${DEPLOYMENT_NAME%-}"
+
+# Validate
+if ! echo "$DEPLOYMENT_NAME" | grep -qE '^[a-z][a-z0-9-]{0,23}$'; then
+    echo -e "${RED}Error: Derived deployment name '$DEPLOYMENT_NAME' is invalid.${NC}"
+    echo "Set DEPLOYMENT_NAME in .env to override."
+    exit 1
+fi
+
+echo -e "Deployment name: ${GREEN}$DEPLOYMENT_NAME${NC} (derived from owner + assistant)"
+echo ""
+
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}STEP 6/$TOTAL_STEPS: Scanning Account for Existing Resources${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
