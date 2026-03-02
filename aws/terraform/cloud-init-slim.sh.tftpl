@@ -104,7 +104,7 @@ echo "[$(date)] systemd user service enabled."
 
 # ── Clone Setup Repo & Run Post-Clone ─────────────────────────────────────────
 
-su - ec2-user -c "git clone https://github.com/BrennerSpear/openclaw-setup.git ~/openclaw-setup"
+su - ec2-user -c "git clone https://github.com/tychohq/openclaw-setup.git ~/openclaw-setup"
 echo "[$(date)] openclaw-setup repo cloned."
 
 su - ec2-user -c "bash ~/openclaw-setup/aws/scripts/post-clone-setup.sh"
