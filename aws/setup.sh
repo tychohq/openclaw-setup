@@ -337,6 +337,14 @@ if [[ " $* " == *" --destroy "* ]] || [ "${1:-}" = "--destroy" ]; then
             ln -sf "$DEPLOY_DIR/terraform.tfstate" terraform.tfstate
             [ -f "$DEPLOY_DIR/terraform.tfstate.backup" ] && ln -sf "$DEPLOY_DIR/terraform.tfstate.backup" terraform.tfstate.backup
         fi
+
+        # Ensure local backend config + init
+        cat > backend.tf << 'BACKEND'
+terraform {
+  backend "local" {}
+}
+BACKEND
+        terraform init -input=false -reconfigure > /dev/null 2>&1
     fi
 
     echo "Checking what will be destroyed..."
