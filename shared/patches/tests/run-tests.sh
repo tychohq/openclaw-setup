@@ -20,10 +20,11 @@ setup() {
   TEST_PATCHES="$(mktemp -d)"
   MOCK_BIN="$(mktemp -d)"
 
-  # Copy fixture files/skills into the test patches dir
-  mkdir -p "$TEST_PATCHES/patches" "$TEST_PATCHES/files" "$TEST_PATCHES/skills"
+  # Copy fixture files/skills/extensions into the test patches dir
+  mkdir -p "$TEST_PATCHES/patches" "$TEST_PATCHES/files" "$TEST_PATCHES/skills" "$TEST_PATCHES/extensions"
   cp -r "$FIXTURES/files/"* "$TEST_PATCHES/files/" 2>/dev/null || true
   cp -r "$FIXTURES/skills/"* "$TEST_PATCHES/skills/" 2>/dev/null || true
+  cp -r "$FIXTURES/extensions/"* "$TEST_PATCHES/extensions/" 2>/dev/null || true
 
   export OPENCLAW_HOME="$TEST_HOME"
   export OPENCLAW_PATCHES_DIR="$TEST_PATCHES"
@@ -344,7 +345,7 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: exec
-    command: "echo two-space-ok > ~/.openclaw/two-space.txt"
+    command: "echo two-space-ok > $OPENCLAW_HOME/two-space.txt"
 YAML
   apply test-instance >/dev/null
   [[ -f "$TEST_HOME/two-space.txt" ]]
@@ -389,6 +390,39 @@ YAML
   teardown
 }
 
+test_extension_step() {
+  setup
+  # Mock openclaw that handles "plugins install <path>" by copying the dir
+  cat > "$MOCK_BIN/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+echo "$@" >> "${OPENCLAW_HOME}/mock-openclaw-calls.txt"
+if [[ "$1" == "plugins" && "$2" == "install" && -n "$3" ]]; then
+  # Mimic real CLI: copy source dir into extensions/
+  local src="$3"
+  local name="$(basename "$src")"
+  local dest="$OPENCLAW_HOME/extensions/$name"
+  mkdir -p "$dest"
+  cp -r "$src"/* "$dest/"
+fi
+if [[ "$1" == "cron" && "$2" == "list" && "$*" == *"--json"* ]]; then
+  echo "[]"
+fi
+MOCK
+  chmod +x "$MOCK_BIN/openclaw"
+  export PATH="$MOCK_BIN:$PATH"
+  load_patch test-extension-step.yaml
+  apply test-instance >/dev/null
+  # Verify files were installed
+  [[ -f "$TEST_HOME/extensions/test-extension/openclaw.plugin.json" ]]
+  [[ -f "$TEST_HOME/extensions/test-extension/index.ts" ]]
+  jq -e '.id == "test-extension"' "$TEST_HOME/extensions/test-extension/openclaw.plugin.json" >/dev/null
+  # Verify openclaw plugins install was called
+  grep -q "plugins install" "$TEST_HOME/mock-openclaw-calls.txt"
+  # enable: false, so plugins enable should NOT have been called
+  ! grep -q "plugins enable" "$TEST_HOME/mock-openclaw-calls.txt" 2>/dev/null
+  teardown
+}
+
 # ── Run ──────────────────────────────────────────────────────────────────────
 
 echo "openclaw-patch test suite"
@@ -421,6 +455,7 @@ run_test "2-space indent parsing"         test_two_space_indent
 run_test "requires blocks missing vars"   test_requires_blocks_missing_vars
 run_test "requires allows satisfied vars" test_requires_allows_satisfied_vars
 run_test "plugin_enable step"             test_plugin_enable_step
+run_test "extension step"                test_extension_step
 
 echo ""
 echo "Results: $PASS/$TOTAL passed, $FAIL failed"

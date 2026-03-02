@@ -1,0 +1,5 @@
+{
+  "id": "test-extension",
+  "name": "Test Extension",
+  "description": "Test extension for patch system tests"
+}

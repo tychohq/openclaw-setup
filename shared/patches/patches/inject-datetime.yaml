@@ -1,0 +1,9 @@
+id: inject-datetime
+description: "Injects current datetime into every agent turn"
+targets: ["*"]
+created: 2026-03-02T17:30:00Z
+
+steps:
+  - type: extension
+    name: inject-datetime
+    enable: true

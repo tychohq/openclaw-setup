@@ -270,7 +270,36 @@ Calls `openclaw update --yes` to update OpenClaw. The CLI handles bun/npm detect
 
 ---
 
-## 10. `restart` — Restart the OpenClaw gateway
+## 11. `extension` — Install a plugin extension
+
+Copies a plugin extension directory from the repo into `~/.openclaw/extensions/` and optionally enables it. When enabled, also registers the extension path in `plugins.load.paths` for provenance tracking.
+
+```yaml
+- type: extension
+  name: inject-datetime
+  enable: true
+  source_dir: inject-datetime  # optional, defaults to name
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | yes | Extension name (becomes destination directory name). |
+| `source_dir` | no | Source directory name in `extensions/` if different from `name`. |
+| `enable` | no | Auto-enable the extension via `openclaw plugins enable`. Default: `true`. |
+
+**Rules:**
+- Source directory must exist in `extensions/` in the repo.
+- Destination is `~/.openclaw/extensions/<name>/`.
+- Full copy — replaces existing extension entirely.
+- When `enable: true`, adds the extension path to `plugins.load.paths` in `openclaw.json` for provenance.
+- When `enable: true`, calls `openclaw plugins enable <name>` to activate the extension.
+- Requires gateway restart for the extension to take effect.
+
+---
+
+## 12. `restart` — Restart the OpenClaw gateway
 
 ```yaml
 - type: restart

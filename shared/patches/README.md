@@ -72,6 +72,7 @@ Where `files/configs/update-models.json` contains:
 | `plugin_enable` | Enable an OpenClaw plugin by id |
 | `mkdir` | Create directories |
 | `skill` | Copy a skill directory to `~/.openclaw/skills/` |
+| `extension` | Install a plugin extension to `~/.openclaw/extensions/` |
 | `clawhub` | Install/update ClawHub skills |
 | `cron` | Create or update a cron job |
 | `exec` | Run a shell command |
@@ -104,7 +105,8 @@ Then either run manually or set up a cron job for periodic sync.
 ```
 patches/           Patch manifests (YAML)
 files/             File contents referenced by patches
-skills/            Skill directories referenced by patches  
+skills/            Skill directories referenced by patches
+extensions/        Plugin extension directories referenced by patches
 scripts/           The openclaw-patch CLI
 docs/              Detailed documentation
 ```

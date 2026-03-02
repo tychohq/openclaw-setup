@@ -1,0 +1,5 @@
+{
+  "id": "inject-datetime",
+  "name": "Inject Datetime",
+  "description": "Prepends current date and time to every agent turn via before_prompt_build"
+}
