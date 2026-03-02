@@ -6,6 +6,3 @@ created: 2026-03-01T22:05:00Z
 steps:
   - type: config_patch
     merge_file: configs/discord-channel.json
-
-  - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["discord"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_discord.json && mv /tmp/_oc_patch_discord.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json

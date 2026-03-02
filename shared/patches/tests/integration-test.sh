@@ -26,7 +26,7 @@ trap cleanup EXIT
 
 # ── Step 1: Create a fresh baseline config via openclaw onboard ──
 info "Creating fresh config via openclaw onboard --non-interactive"
-# onboard may exit non-zero due to gateway connection failure (expected)
+# onboard may exit non-zero due to gateway connection failure (expected — no gateway running for test profile)
 openclaw --profile "$PROFILE" onboard --non-interactive --accept-risk --auth-choice skip 2>&1 | tail -3 || true
 
 CONFIG="$PROFILE_DIR/openclaw.json"
@@ -70,14 +70,17 @@ CHECKS=(
   # model-providers
   '.models.mode == "merge"'
 
-  # discord-channel
+  # discord-channel (config_patch sets entries + channel settings)
+  '.plugins.entries.discord.enabled == true'
   '.channels.discord.enabled == true'
   '.channels.discord.groupPolicy == "allowlist"'
 
   # telegram-channel
+  '.plugins.entries.telegram.enabled == true'
   '.channels.telegram.enabled == true'
 
   # signal-channel
+  '.plugins.entries.signal.enabled == true'
   '.channels.signal.enabled == true'
 
   # skills-config
@@ -103,17 +106,7 @@ for check in "${CHECKS[@]}"; do
   fi
 done
 
-# ── Step 4: Check plugins.allow has channel plugins ──
-for plugin in discord telegram signal; do
-  if jq -e ".plugins.allow | index(\"$plugin\")" "$CONFIG" >/dev/null 2>&1; then
-    ok "plugins.allow contains '$plugin'"
-  else
-    echo "FAIL: plugins.allow missing '$plugin'"
-    FAILED=$((FAILED + 1))
-  fi
-done
-
-# ── Step 5: Idempotency check ──
+# ── Step 4: Idempotency check ──
 info "Re-applying patches (idempotency check)..."
 OPENCLAW_HOME="$PROFILE_DIR" OPENCLAW_PATCHES_DIR="$REPO_ROOT" \
   bash "$PATCH_CLI" apply -d "$DEPLOYMENT" 2>&1 | tail -1
@@ -122,7 +115,6 @@ ok "Idempotency: re-apply completed"
 # ── Summary ──
 echo ""
 TOTAL=${#CHECKS[@]}
-TOTAL=$((TOTAL + 3)) # +3 for plugin checks
 PASSED=$((TOTAL - FAILED))
 echo "Integration test: $PASSED/$TOTAL checks passed, $FAILED failed"
 [[ $FAILED -eq 0 ]] && ok "ALL CHECKS PASSED" || die "$FAILED checks failed"

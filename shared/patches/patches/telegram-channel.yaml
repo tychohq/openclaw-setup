@@ -6,6 +6,3 @@ created: 2026-03-01T22:06:00Z
 steps:
   - type: config_patch
     merge_file: configs/telegram-channel.json
-
-  - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["telegram"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_telegram.json && mv /tmp/_oc_patch_telegram.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json

@@ -6,6 +6,3 @@ created: 2026-03-01T22:08:00Z
 steps:
   - type: config_patch
     merge_file: configs/slack-channel.json
-
-  - type: exec
-    command: jq '.plugins.allow=((.plugins.allow//[])+["slack"]|unique)' ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json > /tmp/_oc_patch_slack.json && mv /tmp/_oc_patch_slack.json ${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json
