@@ -179,3 +179,9 @@ variable "google_oauth_credentials_json" {
   default     = ""
   sensitive   = true
 }
+
+variable "use_slim_cloud_init" {
+  description = "Use the slim cloud-init template (git-clone based) instead of the full baked template"
+  type        = bool
+  default     = false
+}
