@@ -1,0 +1,14 @@
+[
+  "agent-defaults",
+  "browser-config",
+  "discord-channel",
+  "memory-config",
+  "model-providers",
+  "security-config",
+  "session-config",
+  "signal-channel",
+  "skills-config",
+  "slack-channel",
+  "telegram-channel",
+  "tools-config"
+]

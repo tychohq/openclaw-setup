@@ -17,14 +17,21 @@ type BeforePromptBuildResult = {
   prependContext?: string;
 };
 
+function getTimezone(config: unknown): string {
+  try {
+    const c = config as any;
+    return c?.agents?.defaults?.userTimezone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 export default function register(api: OpenClawPluginApi) {
   api.on(
     "before_prompt_build",
     async (_event: BeforePromptBuildEvent): Promise<BeforePromptBuildResult | void> => {
       try {
-        const timezone =
-          (api.config as Record<string, unknown>)?.agents?.defaults?.userTimezone as string ||
-          "UTC";
+        const timezone = getTimezone(api.config);
 
         const now = new Date().toLocaleString("en-US", {
           timeZone: timezone,
