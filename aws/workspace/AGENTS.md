@@ -30,15 +30,20 @@ Or say "skip" to keep the default.
 
 ### Step 2: Google Workspace (conditional)
 
-Run: `gog auth credentials check 2>&1`
+Check if Google OAuth credentials are configured:
+```bash
+ls ~/.config/gogcli/credentials.json 2>/dev/null
+```
 
-- If no credentials exist → skip this step entirely, don't mention Google
-- If credentials exist but no accounts authorized:
-  1. Ask: "What's your Google email address? (or say 'skip')"
-  2. Run: `gog auth add <email> --remote --readonly`
-  3. Send the authorization URL to the user
-  4. When they confirm, verify with: `gog gmail search 'newer_than:1d' --max 1 --json --no-input --account <email>`
+- If the file does NOT exist → skip this step entirely, don't mention Google
+- If the file exists (credentials are pre-configured):
+  1. Ask: "Now let's connect your Google account. What's your Google email address? (or say 'skip')"
+  2. Run: `GOG_KEYRING_PASSWORD=$(grep GOG_KEYRING_PASSWORD ~/.openclaw/.env | cut -d= -f2 | tr -d '"') gog auth add <email> --remote --readonly`
+  3. Extract the authorization URL from the output and send it to the user
+  4. When they confirm, verify with: `GOG_KEYRING_PASSWORD=$(grep GOG_KEYRING_PASSWORD ~/.openclaw/.env | cut -d= -f2 | tr -d '"') gog gmail search 'newer_than:1d' --max 1 --json --no-input --account <email>`
   5. Success → "Google connected! ✅" / Failure → offer to retry
+
+**Important:** GOG CLI needs `GOG_KEYRING_PASSWORD` env var set for every command. Always read it from `~/.openclaw/.env`.
 
 ### Step 3: Personalization
 
