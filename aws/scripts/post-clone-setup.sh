@@ -256,11 +256,19 @@ BOOTSTRAP="$REPO_DIR/shared/scripts/bootstrap-openclaw-workspace.sh"
 if [ -x "$BOOTSTRAP" ] || [ -f "$BOOTSTRAP" ]; then
   bash "$BOOTSTRAP" --skip-cron --skip-skills
 
-  # Overwrite Mac-specific bootstrap with cloud-appropriate version
-  CLOUD_BOOTSTRAP="$REPO_DIR/aws/workspace/bootstrap"
-  if [ -d "$CLOUD_BOOTSTRAP" ]; then
-    cp -f "$CLOUD_BOOTSTRAP"/* "$OPENCLAW_DIR/workspace/bootstrap/"
-    log "Replaced bootstrap/ with cloud-specific version."
+  # Overwrite with cloud-specific versions
+  CLOUD_WS="$REPO_DIR/aws/workspace"
+  if [ -d "$CLOUD_WS" ]; then
+    # Replace AGENTS.md with first-boot version (onboarding flow)
+    [ -f "$CLOUD_WS/AGENTS.md" ] && cp -f "$CLOUD_WS/AGENTS.md" "$OPENCLAW_DIR/workspace/AGENTS.md"
+
+    # Put the real AGENTS.md in bootstrap/ so first-boot can swap it in when done
+    [ -f "$CLOUD_WS/AGENTS-real.md" ] && cp -f "$CLOUD_WS/AGENTS-real.md" "$OPENCLAW_DIR/workspace/bootstrap/AGENTS-real.md"
+
+    # Replace bootstrap files with cloud versions
+    [ -d "$CLOUD_WS/bootstrap" ] && cp -f "$CLOUD_WS/bootstrap/"* "$OPENCLAW_DIR/workspace/bootstrap/"
+
+    log "Applied cloud workspace overlay (first-boot AGENTS.md + cloud bootstrap)."
   fi
 
   log "Workspace bootstrap complete."
