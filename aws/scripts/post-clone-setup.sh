@@ -244,7 +244,8 @@ if [ -n "$CLAWHUB_SKILLS" ]; then
   if command -v clawhub &>/dev/null; then
     IFS=',' read -ra SKILLS <<< "$CLAWHUB_SKILLS"
     for skill in "${SKILLS[@]}"; do
-      skill="$(echo "$skill" | xargs)"  # trim whitespace
+      skill="${skill## }"
+      skill="${skill%% }"
       [ -z "$skill" ] && continue
       if [ -d "$HOME/.agents/skills/$skill" ]; then
         log "  Skill $skill already installed — skipping."

@@ -1835,6 +1835,7 @@ if [ -f /tmp/openclaw-env ]; then
         # Cron job selections
         if [ -f "$DEPLOY_DIR/cron-selections.json" ]; then
             CRON_B64=$(base64 < "$DEPLOY_DIR/cron-selections.json" | tr -d '\n')
+            printf "\n" >> /tmp/openclaw-env
             echo "CRON_SELECTIONS_B64=$CRON_B64" >> /tmp/openclaw-env
             echo -e "  Cron selections: ${GREEN}✓ encoded${NC}"
         fi
@@ -1842,8 +1843,9 @@ if [ -f /tmp/openclaw-env ]; then
         # ClawHub skills list
         if [ -f "$DEPLOY_DIR/skills-list.json" ]; then
             # Extract skill names as comma-separated list
-            SKILLS_CSV=$(jq -r '.[].name // .[].id // .[]' "$DEPLOY_DIR/skills-list.json" 2>/dev/null | paste -sd, -)
+            SKILLS_CSV=$(jq -r '.[] | .slug // .name // .id // empty' "$DEPLOY_DIR/skills-list.json" 2>/dev/null | paste -sd, -)
             if [ -n "$SKILLS_CSV" ]; then
+                printf "\n" >> /tmp/openclaw-env
                 echo "CLAWHUB_SKILLS=$SKILLS_CSV" >> /tmp/openclaw-env
                 echo -e "  ClawHub skills: ${GREEN}✓ encoded ($SKILLS_CSV)${NC}"
             fi
@@ -1852,11 +1854,13 @@ if [ -f /tmp/openclaw-env ]; then
         # Google OAuth credentials
         if [ -n "${GOOGLE_OAUTH_CREDENTIALS_FILE:-}" ] && [ -f "${GOOGLE_OAUTH_CREDENTIALS_FILE:-}" ]; then
             GOAUTH_B64=$(base64 < "$GOOGLE_OAUTH_CREDENTIALS_FILE" | tr -d '\n')
+            printf "\n" >> /tmp/openclaw-env
             echo "GOOGLE_OAUTH_CREDENTIALS_B64=$GOAUTH_B64" >> /tmp/openclaw-env
             echo -e "  Google OAuth: ${GREEN}✓ encoded${NC}"
         fi
 
         # First-boot flag
+        printf "\n" >> /tmp/openclaw-env
         echo "ENABLE_FIRST_BOOT=true" >> /tmp/openclaw-env
     fi
 
