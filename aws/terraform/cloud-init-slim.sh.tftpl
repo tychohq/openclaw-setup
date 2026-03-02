@@ -1,0 +1,113 @@
+#!/bin/bash
+set -e
+
+LOG=/var/log/openclaw-install.log
+exec > >(tee -a "$LOG") 2>&1
+
+echo "[$(date)] Starting OpenClaw cloud-init (slim)..."
+
+# ── System Update & Base Packages ─────────────────────────────────────────────
+
+dnf update -y
+
+# Install Node.js 22
+curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+dnf install -y nodejs git jq openssl zsh
+
+echo "[$(date)] System packages installed."
+
+# ── Set Timezone ──────────────────────────────────────────────────────────────
+
+timedatectl set-timezone "${timezone}"
+
+# ── Install OpenClaw and Tools Globally ───────────────────────────────────────
+
+npm install -g openclaw clawhub agent-browser mcporter
+echo "[$(date)] OpenClaw and tools installed."
+
+# ── Install Claude Code (native installer) ────────────────────────────────────
+
+su - ec2-user -c "curl -fsSL https://claude.ai/install.sh | bash" || \
+  npm install -g @anthropic-ai/claude-code  # fallback to npm if native fails
+echo "[$(date)] Claude Code installed."
+
+# ── Configure Claude Code ─────────────────────────────────────────────────────
+
+mkdir -p /home/ec2-user/.claude
+cat > /home/ec2-user/.claude/settings.json << 'CLAUDEEOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)"
+    ],
+    "deny": []
+  }
+}
+CLAUDEEOF
+
+chown -R ec2-user:ec2-user /home/ec2-user/.claude
+echo "[$(date)] Claude Code settings written."
+
+# ── Write .env File ───────────────────────────────────────────────────────────
+
+mkdir -p /home/ec2-user/.openclaw
+echo "${openclaw_env_b64}" | base64 -d > /home/ec2-user/.openclaw/.env
+
+# Generate gateway token if missing or empty
+if ! grep -q "^GATEWAY_AUTH_TOKEN=." /home/ec2-user/.openclaw/.env; then
+  TOKEN="$(openssl rand -hex 24)"
+  if grep -q "^GATEWAY_AUTH_TOKEN=" /home/ec2-user/.openclaw/.env; then
+    sed -i "s/^GATEWAY_AUTH_TOKEN=.*/GATEWAY_AUTH_TOKEN=$${TOKEN}/" /home/ec2-user/.openclaw/.env
+  else
+    echo "GATEWAY_AUTH_TOKEN=$${TOKEN}" >> /home/ec2-user/.openclaw/.env
+  fi
+fi
+chmod 600 /home/ec2-user/.openclaw/.env
+echo "[$(date)] .env file written."
+
+# ── systemd User Service ──────────────────────────────────────────────────────
+
+loginctl enable-linger ec2-user
+
+mkdir -p /home/ec2-user/.config/systemd/user
+cat > /home/ec2-user/.config/systemd/user/openclaw-gateway.service << 'SERVICE'
+[Unit]
+Description=OpenClaw Gateway
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart=/usr/bin/openclaw gateway
+Restart=always
+RestartSec=10
+EnvironmentFile=%h/.openclaw/.env
+
+[Install]
+WantedBy=default.target
+SERVICE
+
+chown -R ec2-user:ec2-user /home/ec2-user/.config
+
+# Set up runtime directory for systemd --user in this boot session
+EC2_UID="$(id -u ec2-user)"
+mkdir -p "/run/user/$${EC2_UID}"
+chown ec2-user:ec2-user "/run/user/$${EC2_UID}"
+chmod 700 "/run/user/$${EC2_UID}"
+
+su - ec2-user -c "XDG_RUNTIME_DIR=/run/user/$${EC2_UID} systemctl --user daemon-reload"
+su - ec2-user -c "XDG_RUNTIME_DIR=/run/user/$${EC2_UID} systemctl --user enable openclaw-gateway"
+echo "[$(date)] systemd user service enabled."
+
+# ── Clone Setup Repo & Run Post-Clone ─────────────────────────────────────────
+
+su - ec2-user -c "git clone https://github.com/BrennerSpear/openclaw-setup.git ~/openclaw-setup"
+echo "[$(date)] openclaw-setup repo cloned."
+
+su - ec2-user -c "bash ~/openclaw-setup/aws/scripts/post-clone-setup.sh"
+echo "[$(date)] post-clone-setup.sh complete."
+
+echo "[$(date)] OpenClaw cloud-init (slim) complete!"
