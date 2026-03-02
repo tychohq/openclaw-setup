@@ -1,0 +1,8 @@
+{
+  "name": "inject-datetime",
+  "version": "1.0.0",
+  "description": "Prepends current date and time to every agent turn via before_prompt_build",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  }
+}

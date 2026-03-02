@@ -1,5 +1,10 @@
 {
   "id": "inject-datetime",
   "name": "Inject Datetime",
-  "description": "Prepends current date and time to every agent turn via before_prompt_build"
+  "description": "Prepends current date and time to every agent turn via before_prompt_build",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
 }
