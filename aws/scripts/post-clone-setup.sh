@@ -183,9 +183,9 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
     OPENAI_API_KEY="$(env_get OPENAI_API_KEY)"
     DEFAULT_MODEL=""
     if [ -n "$ANTHROPIC_API_KEY" ]; then
-        DEFAULT_MODEL="anthropic/claude-sonnet-4-5"
+        DEFAULT_MODEL="anthropic/claude-opus-4-6"
     elif [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
-        DEFAULT_MODEL="bedrock/anthropic.claude-sonnet-4-5-v2"
+        DEFAULT_MODEL="bedrock/anthropic.claude-opus-4-6"
         CONFIG=$(echo "$CONFIG" | jq '.models.bedrockDiscovery = { enabled: true }')
     elif [ -n "$OPENAI_API_KEY" ]; then
         DEFAULT_MODEL="openai/gpt-4.1"
