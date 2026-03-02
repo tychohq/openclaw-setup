@@ -103,6 +103,7 @@ else
   # Copy subdirectories (docs/, tools/, scripts/, templates/, bootstrap/)
   for subdir in docs tools scripts templates bootstrap; do
     if [ -d "$WORKSPACE_SRC/$subdir" ]; then
+      mkdir -p "$WORKSPACE/$subdir"
       for f in "$WORKSPACE_SRC/$subdir"/*; do
         [ ! -f "$f" ] && continue
         basename="$(basename "$f")"

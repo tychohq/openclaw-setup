@@ -55,6 +55,8 @@ echo "[$(date)] Claude Code settings written."
 
 mkdir -p /home/ec2-user/.openclaw
 echo "${openclaw_env_b64}" | base64 -d > /home/ec2-user/.openclaw/.env
+# Ensure .env ends with a newline (base64encode may strip trailing newline)
+sed -i -e '$a\' /home/ec2-user/.openclaw/.env
 
 # Generate gateway token if missing or empty
 if ! grep -q "^GATEWAY_AUTH_TOKEN=." /home/ec2-user/.openclaw/.env; then
@@ -62,7 +64,7 @@ if ! grep -q "^GATEWAY_AUTH_TOKEN=." /home/ec2-user/.openclaw/.env; then
   if grep -q "^GATEWAY_AUTH_TOKEN=" /home/ec2-user/.openclaw/.env; then
     sed -i "s/^GATEWAY_AUTH_TOKEN=.*/GATEWAY_AUTH_TOKEN=$${TOKEN}/" /home/ec2-user/.openclaw/.env
   else
-    echo "GATEWAY_AUTH_TOKEN=$${TOKEN}" >> /home/ec2-user/.openclaw/.env
+    printf '\n%s\n' "GATEWAY_AUTH_TOKEN=$${TOKEN}" >> /home/ec2-user/.openclaw/.env
   fi
 fi
 chmod 600 /home/ec2-user/.openclaw/.env
