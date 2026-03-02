@@ -87,6 +87,8 @@
 
     <!-- Cron Tab -->
     <div id="panel-cron" class="hidden">
+      <!-- README intro -->
+      <div id="cron-readme" class="hidden mb-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4 text-sm text-gray-300 leading-relaxed"></div>
       <!-- Settings Bar -->
       <div class="bg-gray-900/60 rounded-lg border border-gray-800 p-4 mb-4">
         <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -511,6 +513,41 @@ async function downloadBundle() {
 // ── Cron Jobs ──
 const ALERT_JOBS = new Set(['system-watchdog', 'error-log-digest', 'cron-health-watchdog']);
 
+async function loadCronReadme() {
+  try {
+    const url = rawUrl('shared/cron-jobs/README.md');
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+function renderCronReadme(markdown) {
+  const el = document.getElementById('cron-readme');
+  if (!el || !markdown) return;
+  // Extract first paragraph after the top-level heading as intro text
+  const lines = markdown.split('\n');
+  const introLines = [];
+  let foundHeading = false;
+  for (const line of lines) {
+    if (!foundHeading) {
+      if (line.startsWith('# ')) { foundHeading = true; continue; }
+      continue;
+    }
+    if (line.trim() === '') {
+      if (introLines.length > 0) break;
+      continue;
+    }
+    if (line.startsWith('#')) break;
+    introLines.push(line);
+  }
+  if (introLines.length === 0) return;
+  el.textContent = introLines.join(' ');
+  el.classList.remove('hidden');
+}
+
 async function loadCronCatalog() {
   try {
     const url = LOCAL
@@ -917,6 +954,9 @@ async function init() {
     if (skillsLoadingEl) skillsLoadingEl.textContent = 'Error loading skills: ' + err.message;
     console.error('Skills load error:', err);
   }
+
+  // Load cron readme
+  loadCronReadme().then(md => { if (md) renderCronReadme(md); });
 
   // Load cron jobs
   const cronLoadingEl = document.getElementById('cron-loading');
