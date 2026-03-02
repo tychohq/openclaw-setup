@@ -5,4 +5,4 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: exec
-    command: "echo A >> ~/.openclaw/order-test.txt"
+    command: "echo A >> $OPENCLAW_HOME/order-test.txt"

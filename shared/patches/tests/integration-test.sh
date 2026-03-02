@@ -1,37 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ── Integration test: apply all patches against a real openclaw onboard config ──
+# ── Integration test: apply all patches against a minimal baseline config ────
 #
-# Creates a temp OpenClaw profile, runs onboard --non-interactive, applies all
-# patches, then validates the result is valid JSON with expected keys.
+# Creates a temp dir with a minimal openclaw.json, mocks the openclaw CLI,
+# applies all patches, then validates the result is valid JSON with expected keys.
+# Fully isolated — no files created in $HOME.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PATCH_CLI="$REPO_ROOT/scripts/openclaw-patch"
 
-PROFILE="test-patch-integration-$$"
-PROFILE_DIR="$HOME/.openclaw-$PROFILE"
 DEPLOYMENT="${1:-test-instance}"
 
 die()  { echo "FAIL: $*" >&2; exit 1; }
 info() { echo "→ $*"; }
 ok()   { echo "✓ $*"; }
 
+PROFILE_DIR="$(mktemp -d)"
+MOCK_BIN="$(mktemp -d)"
+
 cleanup() {
-  info "Cleaning up profile: $PROFILE"
-  rm -rf "$PROFILE_DIR" "$HOME/.openclaw/workspace-$PROFILE" 2>/dev/null || true
+  info "Cleaning up: $PROFILE_DIR"
+  rm -rf "$PROFILE_DIR" "$MOCK_BIN" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-# ── Step 1: Create a fresh baseline config via openclaw onboard ──
-info "Creating fresh config via openclaw onboard --non-interactive"
-# onboard may exit non-zero due to gateway connection failure (expected — no gateway running for test profile)
-openclaw --profile "$PROFILE" onboard --non-interactive --accept-risk --auth-choice skip 2>&1 | tail -3 || true
+# ── Mock openclaw binary ──
+# Handles `plugins enable` (jq merge) and `config set` (jq setpath)
+# so the integration test doesn't need the real openclaw CLI.
+cat > "$MOCK_BIN/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+CONFIG="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_HOME/openclaw.json}"
 
+if [[ "${1:-}" == "plugins" && "${2:-}" == "enable" ]]; then
+  plugin="${3:?missing plugin name}"
+  tmp=$(mktemp)
+  jq --arg p "$plugin" '.plugins.entries[$p] = {"enabled": true}' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  echo "Enabled plugin \"$plugin\"."
+  exit 0
+fi
+
+if [[ "${1:-}" == "config" && "${2:-}" == "set" ]]; then
+  path="${3:?missing path}"
+  value="${4:?missing value}"
+  tmp=$(mktemp)
+  # Convert dot path to jq path array: "a.b.c" -> ["a","b","c"]
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  # Try to parse value as JSON first, fall back to string
+  if echo "$value" | jq empty 2>/dev/null; then
+    jq --argjson v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  else
+    jq --arg v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  fi
+  echo "Updated $path."
+  exit 0
+fi
+
+if [[ "${1:-}" == "cron" && "${2:-}" == "list" ]]; then
+  echo "[]"
+  exit 0
+fi
+
+# Log anything else
+echo "mock-openclaw: $*" >> "${OPENCLAW_HOME:-/tmp}/mock-openclaw-calls.txt"
+MOCK
+chmod +x "$MOCK_BIN/openclaw"
+export PATH="$MOCK_BIN:$PATH"
+
+# ── Step 1: Create a minimal baseline config ──
 CONFIG="$PROFILE_DIR/openclaw.json"
-[[ -f "$CONFIG" ]] || die "onboard didn't create $CONFIG"
-ok "Baseline config created: $(wc -l < "$CONFIG") lines"
+info "Creating baseline config in $PROFILE_DIR"
+
+cat > "$CONFIG" << 'BASELINE'
+{
+  "version": 1,
+  "source": "test",
+  "agents": {},
+  "channels": {},
+  "models": {},
+  "plugins": {
+    "entries": {}
+  },
+  "session": {},
+  "tools": {},
+  "skills": {},
+  "memory": {},
+  "hooks": {}
+}
+BASELINE
+
+ok "Baseline config created"
 
 jq empty "$CONFIG" || die "Baseline config is not valid JSON"
 ok "Baseline config is valid JSON"
@@ -88,14 +147,20 @@ CHECKS=(
   '.plugins.entries.discord.enabled == true'
   '.channels.discord.enabled == true'
   '.channels.discord.groupPolicy == "allowlist"'
+  '(.channels.discord.allowFrom | length) > 0'
 
   # telegram-channel
   '.plugins.entries.telegram.enabled == true'
   '.channels.telegram.enabled == true'
+  '(.channels.telegram.allowFrom | length) > 0'
 
   # signal-channel
   '.plugins.entries.signal.enabled == true'
   '.channels.signal.enabled == true'
+  '(.channels.signal.allowFrom | length) > 0'
+
+  # slack-channel
+  '(.channels.slack.allowFrom | length) > 0'
 
   # skills-config
   '.skills.install.nodeManager == "bun"'

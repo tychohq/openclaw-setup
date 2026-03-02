@@ -8,4 +8,4 @@ requires:
 
 steps:
   - type: exec
-    command: "echo requires-ok > ~/.openclaw/requires-satisfied-marker.txt"
+    command: "echo requires-ok > $OPENCLAW_HOME/requires-satisfied-marker.txt"

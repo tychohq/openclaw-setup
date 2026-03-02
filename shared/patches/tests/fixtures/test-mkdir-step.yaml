@@ -6,5 +6,5 @@ created: 2026-01-01T00:00:00Z
 steps:
   - type: mkdir
     paths:
-      - ~/.openclaw/workspace/memory/daily
-      - ~/.openclaw/workspace/research
+      - $OPENCLAW_HOME/workspace/memory/daily
+      - $OPENCLAW_HOME/workspace/research

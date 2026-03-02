@@ -12,5 +12,17 @@ steps:
   - type: plugin_enable
     plugin: discord
 
+  - type: config_set
+    path: channels.discord.allowFrom
+    value: '["$DISCORD_OWNER_ID"]'
+
+  - type: config_set
+    path: channels.discord.guilds.$DISCORD_GUILD_ID.requireMention
+    value: "false"
+
+  - type: config_set
+    path: channels.discord.guilds.$DISCORD_GUILD_ID.users
+    value: '["$DISCORD_OWNER_ID"]'
+
   - type: config_patch
     merge_file: configs/discord-channel.json

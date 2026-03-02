@@ -5,7 +5,7 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: file
-    path: ~/.openclaw/workspace/marked.txt
+    path: $OPENCLAW_HOME/workspace/marked.txt
     content: "## Custom Section\nSome new content"
     mode: append
     marker: "## Custom Section"

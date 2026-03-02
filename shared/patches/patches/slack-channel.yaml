@@ -12,5 +12,9 @@ steps:
   - type: plugin_enable
     plugin: slack
 
+  - type: config_set
+    path: channels.slack.allowFrom
+    value: '["$SLACK_OWNER_USER_ID"]'
+
   - type: config_patch
     merge_file: configs/slack-channel.json

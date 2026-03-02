@@ -5,4 +5,4 @@ created: 2026-01-01T00:00:05Z
 
 steps:
   - type: exec
-    command: "echo test-exec-marker > ~/.openclaw/exec-marker.txt"
+    command: "echo test-exec-marker > $OPENCLAW_HOME/exec-marker.txt"

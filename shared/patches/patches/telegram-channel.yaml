@@ -11,5 +11,9 @@ steps:
   - type: plugin_enable
     plugin: telegram
 
+  - type: config_set
+    path: channels.telegram.allowFrom
+    value: '["$TELEGRAM_OWNER_ID"]'
+
   - type: config_patch
     merge_file: configs/telegram-channel.json

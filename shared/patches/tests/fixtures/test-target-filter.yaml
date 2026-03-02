@@ -5,5 +5,5 @@ created: 2026-01-01T00:00:07Z
 
 steps:
   - type: file
-    path: ~/.openclaw/workspace/target-only.txt
+    path: $OPENCLAW_HOME/workspace/target-only.txt
     content: "should only apply to opensesame"

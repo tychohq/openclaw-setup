@@ -5,6 +5,6 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: file
-    path: ~/.openclaw/workspace/appendable.txt
+    path: $OPENCLAW_HOME/workspace/appendable.txt
     content: "appended line"
     mode: append

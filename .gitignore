@@ -30,3 +30,6 @@ tfplan
 shared/checklist/checklist.conf
 tmp-current-config.json
 tmp-default-config.json
+
+# Discord channel mapping for stop hook notifications
+.discord-channel

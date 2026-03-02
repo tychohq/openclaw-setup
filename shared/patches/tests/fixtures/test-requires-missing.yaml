@@ -8,4 +8,4 @@ requires:
 
 steps:
   - type: exec
-    command: "echo should-not-run > ~/.openclaw/requires-marker.txt"
+    command: "echo should-not-run > $OPENCLAW_HOME/requires-marker.txt"

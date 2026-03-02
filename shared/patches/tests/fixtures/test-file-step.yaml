@@ -5,5 +5,5 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: file
-    path: ~/.openclaw/workspace/test-content.txt
+    path: $OPENCLAW_HOME/workspace/test-content.txt
     content_file: test-content.txt
