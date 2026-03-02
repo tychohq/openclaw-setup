@@ -1788,7 +1788,6 @@ else
 fi
 
 # Slim cloud-init (git-clone based, for new deployments)
-[ "${USE_SLIM_CLOUD_INIT:-false}" = "true" ] && echo 'use_slim_cloud_init = true' >> terraform.tfvars
 
 # Existing infrastructure (deploy into existing VPC)
 [ -n "${EXISTING_VPC_ID:-}" ] && echo "existing_vpc_id            = \"$EXISTING_VPC_ID\"" >> terraform.tfvars
