@@ -178,6 +178,12 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg token "$AWS_BEARER_TOKEN_BEDROCK" '.env.vars.AWS_BEARER_TOKEN_BEDROCK = $token')
     fi
 
+    # Add GOG keyring password so agent can run gog commands
+    GOG_KP="$(env_get GOG_KEYRING_PASSWORD)"
+    if [ -n "$GOG_KP" ]; then
+        CONFIG=$(echo "$CONFIG" | jq --arg pw "$GOG_KP" '.env.vars.GOG_KEYRING_PASSWORD = $pw')
+    fi
+
     # Set default model based on available API keys (first match wins)
     ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
     OPENAI_API_KEY="$(env_get OPENAI_API_KEY)"
