@@ -172,7 +172,7 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
           }')
     fi
 
-    # Add Bedrock bearer token if configured
+    # Add Bedrock bearer token to env if configured
     AWS_BEARER_TOKEN_BEDROCK="$(env_get AWS_BEARER_TOKEN_BEDROCK)"
     if [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg token "$AWS_BEARER_TOKEN_BEDROCK" '.env.vars.AWS_BEARER_TOKEN_BEDROCK = $token')
@@ -185,8 +185,20 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
     if [ -n "$ANTHROPIC_API_KEY" ]; then
         DEFAULT_MODEL="anthropic/claude-opus-4-6"
     elif [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
-        DEFAULT_MODEL="bedrock/anthropic.claude-opus-4-6"
-        CONFIG=$(echo "$CONFIG" | jq '.models.bedrockDiscovery = { enabled: true }')
+        # Bedrock requires inference profile IDs (us. prefix), not bare model IDs.
+        # AWS_REGION from .env drives the API endpoint URL.
+        # Model ID uses the US cross-region inference profile (works in all US regions).
+        BEDROCK_REGION="$(env_get AWS_REGION)"
+        BEDROCK_REGION="${BEDROCK_REGION:-us-east-1}"
+        BEDROCK_MODEL_ID="us.anthropic.claude-opus-4-6-v1"
+        DEFAULT_MODEL="amazon-bedrock/${BEDROCK_MODEL_ID}"
+
+        CONFIG=$(echo "$CONFIG" | jq           --arg region "$BEDROCK_REGION"           --arg model_id "$BEDROCK_MODEL_ID"           '.models.providers["amazon-bedrock"] = {
+            baseUrl: ("https://bedrock-runtime." + $region + ".amazonaws.com"),
+            api: "bedrock-converse-stream",
+            auth: "aws-sdk",
+            models: [{ id: $model_id, name: "Claude Opus 4.6" }]
+          }')
     elif [ -n "$OPENAI_API_KEY" ]; then
         DEFAULT_MODEL="openai/gpt-4.1"
     fi
