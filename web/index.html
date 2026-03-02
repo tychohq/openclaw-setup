@@ -724,21 +724,39 @@ function applyCronSettings() {
 
 // ── Skills (ClawHub) ──
 const CLAWHUB_API = 'https://clawhub.ai/api/v1/skills';
-const CLAWHUB_AUTHOR = 'BrennerSpear';
 
 async function loadAllSkills() {
-  const all = [];
-  let cursor = null;
-  do {
-    let url = `${CLAWHUB_API}?author=${CLAWHUB_AUTHOR}`;
-    if (cursor) url += `&cursor=${cursor}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`ClawHub API error: ${res.status}`);
-    const data = await res.json();
-    all.push(...(data.items || []));
-    cursor = data.nextCursor || null;
-  } while (cursor);
-  return all;
+  // Load the curated skill slugs catalog
+  const catalogUrl = LOCAL
+    ? 'skills-catalog.json'
+    : `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/web/skills-catalog.json`;
+  const catalogRes = await fetch(catalogUrl);
+  if (!catalogRes.ok) throw new Error(`Failed to fetch skills catalog: ${catalogRes.status}`);
+  const slugs = await catalogRes.json();
+
+  // Fetch each skill's details in parallel from the ClawHub API
+  const results = await Promise.allSettled(
+    slugs.map(async (slug) => {
+      const res = await fetch(`${CLAWHUB_API}/${slug}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.skill) return null;
+      return {
+        slug: data.skill.slug,
+        displayName: data.skill.displayName,
+        summary: data.skill.summary,
+        tags: data.skill.tags || {},
+        stats: data.skill.stats || {},
+        createdAt: data.skill.createdAt,
+        updatedAt: data.skill.updatedAt,
+        latestVersion: data.latestVersion || null,
+      };
+    })
+  );
+
+  return results
+    .filter(r => r.status === 'fulfilled' && r.value)
+    .map(r => r.value);
 }
 
 function renderSkillCard(skill) {

@@ -36,3 +36,4 @@ tmp-default-config.json
 
 # Generated backend config (S3 state)
 backend.tf
+node_modules/

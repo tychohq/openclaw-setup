@@ -95,8 +95,8 @@ By default, `setup.sh` stores Terraform state in S3 with DynamoDB locking. This 
 
 The setup wizard automatically:
 
-1. Creates an S3 bucket: `{deployment-name}-tfstate-{aws-account-id}`
-2. Creates a DynamoDB table: `{deployment-name}-tfstate-lock`
+1. Creates an S3 bucket: `{owner-name}-{assistant-name}-tfstate` (e.g. `brenner-spear-axel-tfstate`)
+2. Creates a DynamoDB table: `{owner-name}-{assistant-name}-tfstate-lock`
 3. Generates `backend.tf` (gitignored) with the S3 backend config
 4. Migrates any existing local state to S3
 
