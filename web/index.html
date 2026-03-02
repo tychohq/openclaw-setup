@@ -62,6 +62,7 @@
       <button onclick="switchTab('patches')" id="tab-patches" class="tab-active py-3 px-1 text-sm font-medium cursor-pointer">Patches</button>
       <button onclick="switchTab('cron')" id="tab-cron" class="tab-inactive py-3 px-1 text-sm font-medium cursor-pointer">Cron Jobs</button>
       <button onclick="switchTab('skills')" id="tab-skills" class="tab-inactive py-3 px-1 text-sm font-medium cursor-pointer">Skills</button>
+      <button onclick="switchTab('bundled')" id="tab-bundled" class="tab-inactive py-3 px-1 text-sm font-medium cursor-pointer">Bundled Skills</button>
     </div>
   </nav>
 
@@ -154,6 +155,20 @@
       <!-- Skills Grid -->
       <div id="skills-grid" class="grid gap-3"></div>
     </div>
+
+    <!-- Bundled Skills Tab -->
+    <div id="panel-bundled" class="hidden">
+      <!-- Controls -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+          <button onclick="selectAllBundled()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Select All</button>
+          <button onclick="deselectAllBundled()" class="text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 cursor-pointer" type="button">Deselect All</button>
+        </div>
+        <span class="text-sm text-gray-500" id="bundled-count">52 skills</span>
+      </div>
+      <!-- Bundled Skills Grid -->
+      <div id="bundled-grid" class="grid gap-3"></div>
+    </div>
   </main>
 
   <!-- Floating Download Bar -->
@@ -176,7 +191,20 @@ const state = {
   cronSelected: new Set(),
   skills: [],          // loaded ClawHub skill objects
   skillsSelected: new Set(),
+  bundledSelected: new Set(),
 };
+
+const BUNDLED_SKILLS = [
+  '1password', 'apple-notes', 'apple-reminders', 'bear-notes', 'blogwatcher',
+  'blucli', 'bluebubbles', 'camsnap', 'canvas', 'clawhub', 'coding-agent',
+  'discord', 'eightctl', 'gemini', 'gh-issues', 'gifgrep', 'github', 'gog',
+  'goplaces', 'healthcheck', 'himalaya', 'imsg', 'mcporter', 'model-usage',
+  'nano-banana-pro', 'nano-pdf', 'notion', 'obsidian', 'openai-image-gen',
+  'openai-whisper', 'openai-whisper-api', 'openhue', 'oracle', 'ordercli',
+  'peekaboo', 'sag', 'session-logs', 'sherpa-onnx-tts', 'skill-creator',
+  'slack', 'songsee', 'sonoscli', 'spotify-player', 'summarize', 'things-mac',
+  'tmux', 'trello', 'video-frames', 'voice-call', 'wacli', 'weather', 'xurl',
+];
 
 // ── Mode detection ──
 const params = new URLSearchParams(window.location.search);
@@ -367,13 +395,15 @@ function updateDownloadBar() {
   const patchCount = state.selected.size;
   const cronCount = state.cronSelected.size;
   const skillCount = state.skillsSelected.size;
-  const total = patchCount + cronCount + skillCount;
+  const bundledCount = state.bundledSelected.size;
+  const total = patchCount + cronCount + skillCount + bundledCount;
   if (total > 0) {
     bar.classList.remove('translate-y-full');
     const parts = [];
     if (patchCount > 0) parts.push(`${patchCount} patch${patchCount === 1 ? '' : 'es'}`);
     if (cronCount > 0) parts.push(`${cronCount} cron job${cronCount === 1 ? '' : 's'}`);
     if (skillCount > 0) parts.push(`${skillCount} skill${skillCount === 1 ? '' : 's'}`);
+    if (bundledCount > 0) parts.push(`${bundledCount} bundled skill${bundledCount === 1 ? '' : 's'}`);
     count.textContent = parts.join(', ') + ' selected';
   } else {
     bar.classList.add('translate-y-full');
@@ -382,7 +412,7 @@ function updateDownloadBar() {
 
 // ── Tabs ──
 function switchTab(tab) {
-  const tabs = ['patches', 'cron', 'skills'];
+  const tabs = ['patches', 'cron', 'skills', 'bundled'];
   for (const t of tabs) {
     document.getElementById(`tab-${t}`).className = t === tab ? 'tab-active py-3 px-1 text-sm font-medium cursor-pointer' : 'tab-inactive py-3 px-1 text-sm font-medium cursor-pointer';
     document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
@@ -415,6 +445,7 @@ function downloadBundle() {
       selectedPatches: [...state.selected],
       selectedCronJobs: [...state.cronSelected],
       selectedSkills: [...state.skillsSelected],
+      selectedBundledSkills: [...state.bundledSelected],
     },
     patches: selectedPatches,
     configs: embeddedConfigs,
@@ -426,6 +457,11 @@ function downloadBundle() {
       version: s.latestVersion?.version,
     })),
   };
+
+  if (state.bundledSelected.size > 0) {
+    bundle.skills = bundle.skills || {};
+    bundle.allowBundled = [...state.bundledSelected].sort();
+  }
 
   const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -729,6 +765,66 @@ function deselectAllSkills() {
   updateDownloadBar();
 }
 
+// ── Bundled Skills ──
+function renderBundledCard(name) {
+  const isSelected = state.bundledSelected.has(name);
+  const card = document.createElement('div');
+  card.className = 'bg-card rounded-lg border border-gray-800 hover:border-gray-700 transition-colors';
+  card.id = `bundled-${name}`;
+
+  card.innerHTML = `
+    <div class="p-4 select-none cursor-pointer" onclick="toggleBundledSelect('${name}')">
+      <div class="flex items-center gap-3">
+        <input type="checkbox" class="accent-accent w-4 h-4 cursor-pointer rounded"
+               ${isSelected ? 'checked' : ''}
+               onclick="event.stopPropagation(); toggleBundledSelect('${name}')" />
+        <h3 class="font-medium text-white text-sm">${escapeHtml(name)}</h3>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+function renderAllBundled() {
+  const grid = document.getElementById('bundled-grid');
+  grid.innerHTML = '';
+  for (const name of BUNDLED_SKILLS) {
+    grid.appendChild(renderBundledCard(name));
+  }
+}
+
+function toggleBundledSelect(name) {
+  if (state.bundledSelected.has(name)) {
+    state.bundledSelected.delete(name);
+  } else {
+    state.bundledSelected.add(name);
+  }
+  const card = document.getElementById(`bundled-${name}`);
+  if (card) {
+    const cb = card.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = state.bundledSelected.has(name);
+  }
+  updateDownloadBar();
+}
+
+function selectAllBundled() {
+  for (const name of BUNDLED_SKILLS) state.bundledSelected.add(name);
+  for (const name of BUNDLED_SKILLS) {
+    const card = document.getElementById(`bundled-${name}`);
+    if (card) { const cb = card.querySelector('input[type="checkbox"]'); if (cb) cb.checked = true; }
+  }
+  updateDownloadBar();
+}
+
+function deselectAllBundled() {
+  state.bundledSelected.clear();
+  for (const name of BUNDLED_SKILLS) {
+    const card = document.getElementById(`bundled-${name}`);
+    if (card) { const cb = card.querySelector('input[type="checkbox"]'); if (cb) cb.checked = false; }
+  }
+  updateDownloadBar();
+}
+
 // ── Init ──
 async function init() {
   const loadingEl = document.getElementById('loading');
@@ -771,6 +867,9 @@ async function init() {
     loadingEl.textContent = 'Error loading patches: ' + err.message;
     console.error(err);
   }
+
+  // Render bundled skills (static list, no fetching needed)
+  renderAllBundled();
 
   // Load skills from ClawHub
   const skillsLoadingEl = document.getElementById('skills-loading');

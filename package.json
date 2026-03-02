@@ -3,5 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "bash scripts/build-catalog-index.sh && bunx serve . -l 3000"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.7.0",
+    "happy-dom": "^20.7.0"
   }
 }
