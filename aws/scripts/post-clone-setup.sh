@@ -25,7 +25,7 @@ log() { echo "[$(date)] $1"; }
 env_get() {
   local key="$1"
   if [ -f "$ENV_FILE" ]; then
-    grep "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-
+    (grep "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-) || true
   fi
 }
 
