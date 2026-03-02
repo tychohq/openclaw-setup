@@ -163,18 +163,8 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
             enabled: true,
             botToken: $token,
             dmPolicy: "allowlist",
-            allowFrom: (if $owner_id != "" then [$owner_id] else [] end)
+            allowFrom: (if ($owner_id|test("^[0-9]+$")) then [($owner_id|tonumber)] else [] end)
           }')
-    fi
-
-    # Add owner name to agent config
-    if [ -n "$OWNER_NAME" ]; then
-        CONFIG=$(echo "$CONFIG" | jq --arg name "$OWNER_NAME" '.agents.defaults.user.name = $name')
-    fi
-
-    # Add assistant name
-    if [ -n "$ASSISTANT_NAME" ] && [ "$ASSISTANT_NAME" != "OpenClaw" ]; then
-        CONFIG=$(echo "$CONFIG" | jq --arg name "$ASSISTANT_NAME" '.agents.defaults.persona.name = $name')
     fi
 
     # Add Bedrock bearer token if configured
