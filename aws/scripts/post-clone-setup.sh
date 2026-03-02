@@ -24,9 +24,14 @@ log() { echo "[$(date)] $1"; }
 
 env_get() {
   local key="$1"
+  local val=""
   if [ -f "$ENV_FILE" ]; then
-    (grep "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-) || true
+    val="$(grep "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true)"
   fi
+  # Strip optional surrounding double quotes
+  val="${val%\"}"
+  val="${val#\"}"
+  echo "$val"
 }
 
 # ── 1. Install GOG CLI (Linux ARM64) ────────────────────────────────────────
