@@ -777,6 +777,13 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${YELLOW}STEP 5/$TOTAL_STEPS: Configure OpenClaw${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+# When using --auto with --config (pre-filled .env), the entire .env is passed
+# through to the EC2 instance for the slim cloud-init. Bundle files are appended later.
+USE_PREFILLED_ENV=false
+if [ "$AUTO_MODE" = true ] && [ -n "${DEPLOY_DIR:-}" ] && [ -f "${DEPLOY_DIR}/.env" ]; then
+    USE_PREFILLED_ENV=true
+fi
+
 if [ "$AUTO_MODE" = true ]; then
     CONFIG_CHOICE="1"
 else
@@ -1211,7 +1218,12 @@ if [ "$CONFIG_CHOICE" = "1" ]; then
 
     # Write secrets to temp files
     echo "$CONFIG_JSON" > /tmp/openclaw-config.json
-    printf '%s' "$ENV_CONTENT" > /tmp/openclaw-env
+    if [ "$USE_PREFILLED_ENV" = true ]; then
+        # Pass the entire pre-filled .env through (for slim cloud-init)
+        cp "$DEPLOY_DIR/.env" /tmp/openclaw-env
+    else
+        printf '%s' "$ENV_CONTENT" > /tmp/openclaw-env
+    fi
 
     echo ""
     echo -e "${GREEN}✓ Configuration generated${NC}"
@@ -1806,7 +1818,48 @@ fi
 if [ -f /tmp/openclaw-config.json ]; then
     export TF_VAR_openclaw_config_json="$(cat /tmp/openclaw-config.json)"
 fi
+# ── Append bundle files to .env (for slim cloud-init) ────────────────────
+# The slim cloud-init only passes the .env to the EC2 instance. Bundle files
+# from the deployment directory are base64-encoded and appended as env vars.
+# post-clone-setup.sh reads these on the EC2 instance.
 if [ -f /tmp/openclaw-env ]; then
+    if [ -n "${DEPLOY_DIR:-}" ]; then
+        # Config bundle (openclaw.json patches)
+        if [ -f "$DEPLOY_DIR/config-bundle.json" ]; then
+            CONFIG_B64=$(base64 < "$DEPLOY_DIR/config-bundle.json" | tr -d '\n')
+            echo "" >> /tmp/openclaw-env
+            echo "CONFIG_BUNDLE_B64=$CONFIG_B64" >> /tmp/openclaw-env
+            echo -e "  Config bundle: ${GREEN}✓ encoded${NC}"
+        fi
+
+        # Cron job selections
+        if [ -f "$DEPLOY_DIR/cron-selections.json" ]; then
+            CRON_B64=$(base64 < "$DEPLOY_DIR/cron-selections.json" | tr -d '\n')
+            echo "CRON_SELECTIONS_B64=$CRON_B64" >> /tmp/openclaw-env
+            echo -e "  Cron selections: ${GREEN}✓ encoded${NC}"
+        fi
+
+        # ClawHub skills list
+        if [ -f "$DEPLOY_DIR/skills-list.json" ]; then
+            # Extract skill names as comma-separated list
+            SKILLS_CSV=$(jq -r '.[].name // .[].id // .[]' "$DEPLOY_DIR/skills-list.json" 2>/dev/null | paste -sd, -)
+            if [ -n "$SKILLS_CSV" ]; then
+                echo "CLAWHUB_SKILLS=$SKILLS_CSV" >> /tmp/openclaw-env
+                echo -e "  ClawHub skills: ${GREEN}✓ encoded ($SKILLS_CSV)${NC}"
+            fi
+        fi
+
+        # Google OAuth credentials
+        if [ -n "${GOOGLE_OAUTH_CREDENTIALS_FILE:-}" ] && [ -f "${GOOGLE_OAUTH_CREDENTIALS_FILE:-}" ]; then
+            GOAUTH_B64=$(base64 < "$GOOGLE_OAUTH_CREDENTIALS_FILE" | tr -d '\n')
+            echo "GOOGLE_OAUTH_CREDENTIALS_B64=$GOAUTH_B64" >> /tmp/openclaw-env
+            echo -e "  Google OAuth: ${GREEN}✓ encoded${NC}"
+        fi
+
+        # First-boot flag
+        echo "ENABLE_FIRST_BOOT=true" >> /tmp/openclaw-env
+    fi
+
     export TF_VAR_openclaw_env="$(cat /tmp/openclaw-env)"
 fi
 if [ -n "${AUTH_PROFILES_JSON:-}" ]; then
