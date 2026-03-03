@@ -184,13 +184,12 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg pw "$GOG_KP" '.env.vars.GOG_KEYRING_PASSWORD = $pw')
     fi
 
-    # Set default model based on available API keys (first match wins)
+    # Set default model based on available API keys
+    # Bedrock first (cheaper), then direct Anthropic, then OpenAI
     ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
     OPENAI_API_KEY="$(env_get OPENAI_API_KEY)"
     DEFAULT_MODEL=""
-    if [ -n "$ANTHROPIC_API_KEY" ]; then
-        DEFAULT_MODEL="anthropic/claude-opus-4-6"
-    elif [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
+    if [ -n "$AWS_BEARER_TOKEN_BEDROCK" ]; then
         # Bedrock requires inference profile IDs (us. prefix), not bare model IDs.
         # AWS_REGION from .env drives the API endpoint URL.
         # Model ID uses the US cross-region inference profile (works in all US regions).
@@ -205,6 +204,8 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
             auth: "aws-sdk",
             models: [{ id: $model_id, name: "Claude Opus 4.6" }]
           }')
+    elif [ -n "$ANTHROPIC_API_KEY" ]; then
+        DEFAULT_MODEL="anthropic/claude-opus-4-6"
     elif [ -n "$OPENAI_API_KEY" ]; then
         DEFAULT_MODEL="openai/gpt-4.1"
     fi
