@@ -125,7 +125,29 @@ test_config_bundle_decodes_to_openclaw_json() {
 }
 
 test_config_bundle_merges_existing() {
-  grep -q 'jq -s.*\[0\] \* \.\[1\]' "$SCRIPT"
+  # Step-processing loop replaces the old jq deep-merge
+  grep -q 'jq -c.*\.patches\[\]\.steps\[\]' "$SCRIPT"
+}
+
+test_step_loop_handles_config_set() {
+  grep -q 'config_set)' "$SCRIPT"
+}
+
+test_step_loop_handles_config_append() {
+  grep -q 'config_append)' "$SCRIPT"
+}
+
+test_step_loop_handles_plugin_enable() {
+  grep -q 'plugin_enable)' "$SCRIPT"
+}
+
+test_step_loop_handles_extension() {
+  grep -q 'extension)' "$SCRIPT"
+}
+
+test_step_loop_no_config_patch() {
+  # config_patch was removed — must not appear as a case
+  ! grep -q 'config_patch)' "$SCRIPT"
 }
 
 # ── Step 5: Bootstrap Workspace ─────────────────────────────────────────────
@@ -157,7 +179,7 @@ test_clawhub_install_command() {
 }
 
 test_clawhub_checks_existing() {
-  grep -q 'agents/skills/\$skill' "$SCRIPT" || grep -q 'agents/skills/$skill' "$SCRIPT"
+  grep -q 'skills/\$skill' "$SCRIPT" || grep -q 'skills/$skill' "$SCRIPT"
 }
 
 # ── Step 7: Cron Jobs ───────────────────────────────────────────────────────
@@ -599,10 +621,15 @@ run_test "uses gog auth credentials set"  test_google_creds_uses_gog_set
 run_test "cleans temp credentials file"   test_google_creds_cleans_temp_file
 echo ""
 
-echo "Step 4 — Config Bundle:"
+echo "Step 4 — Config Bundle (step-processing loop):"
 run_test "reads bundle from .env"         test_config_bundle_reads_env
 run_test "decodes to openclaw.json"       test_config_bundle_decodes_to_openclaw_json
-run_test "merges with existing config"    test_config_bundle_merges_existing
+run_test "uses step-processing loop"      test_config_bundle_merges_existing
+run_test "handles config_set steps"       test_step_loop_handles_config_set
+run_test "handles config_append steps"    test_step_loop_handles_config_append
+run_test "handles plugin_enable steps"    test_step_loop_handles_plugin_enable
+run_test "handles extension steps"        test_step_loop_handles_extension
+run_test "no config_patch remnants"       test_step_loop_no_config_patch
 echo ""
 
 echo "Step 5 — Bootstrap Workspace:"

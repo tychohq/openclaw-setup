@@ -254,8 +254,11 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
           openclaw plugins enable "$plugin"
           log "Plugin enabled: $plugin"
           ;;
+        extension)
+          log "Skipping extension step (handled by openclaw-patch)"
+          ;;
         *)
-          log "Skipping step type: $step_type"
+          log "Skipping unknown step type: $step_type"
           ;;
       esac
     done
