@@ -5,6 +5,9 @@
 
 set -e
 
+# Disable AWS CLI pager (prevents hangs in automated/pty runs)
+export AWS_PAGER=""
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
