@@ -44,10 +44,11 @@ openclaw-patch publish                 → parse YAML
 ```
 openclaw-patches/
 ├── patches/              # YAML manifests (one per patch)
-├── files/                # File contents referenced by patches
+├── files/                # File contents referenced by file steps
 │   ├── workspace/        # Workspace files (AGENTS.md, etc.)
 │   └── cron/             # Cron job definitions (JSON)
 ├── skills/               # Skill directories copied to ~/.openclaw/skills/
+├── extensions/           # Plugin extension directories
 ├── scripts/
 │   └── openclaw-patch    # The CLI
 ├── tests/                # Test suite
@@ -134,6 +135,36 @@ Reads an existing config array, merges new values (deduped), and writes back via
 - Requires both `openclaw` and `jq` on the instance.
 - Idempotent — running multiple times produces the same result.
 
+### 2c. `plugin_enable` — Enable a plugin
+
+Enables an OpenClaw plugin by id via `openclaw plugins enable`.
+
+```yaml
+- type: plugin_enable
+  plugin: discord
+```
+
+**Rules:**
+- `plugin` is the plugin identifier (e.g. `discord`, `telegram`, `slack`, `signal`).
+- Requires `openclaw` CLI on the instance.
+- Idempotent — enabling an already-enabled plugin is a no-op.
+
+### 2d. `mkdir` — Create directories
+
+Creates one or more directories.
+
+```yaml
+- type: mkdir
+  paths:
+    - ~/.openclaw/workspace/memory/daily
+    - ~/.openclaw/workspace/research
+```
+
+**Rules:**
+- `paths` is required. `~` expands to `$HOME`.
+- Creates parent directories automatically (`mkdir -p`).
+- Idempotent — no error if directory already exists.
+
 ### 3. `skill` — Install a custom skill
 
 Copies a skill directory from the repo into `~/.openclaw/skills/`.
@@ -149,6 +180,22 @@ Copies a skill directory from the repo into `~/.openclaw/skills/`.
 - Source directory must exist in `skills/` in the repo.
 - Destination is `~/.openclaw/skills/<name>/`.
 - Full copy (`cp -r`) — replaces existing skill entirely.
+
+### 3b. `extension` — Install a plugin extension
+
+Copies a plugin extension directory from the repo into `~/.openclaw/extensions/` and optionally enables it.
+
+```yaml
+- type: extension
+  name: inject-datetime
+  enable: true
+```
+
+**Rules:**
+- Source directory must exist in `extensions/` in the repo.
+- Destination is `~/.openclaw/extensions/<name>/`.
+- `enable` defaults to `true`. When enabled, calls `openclaw plugins enable <name>`.
+- Requires gateway restart for the extension to take effect.
 
 ### 4. `clawhub` — Install/update ClawHub skills
 
@@ -168,29 +215,24 @@ Installs or updates skills from the public ClawHub registry.
 
 ### 5. `cron` — Register a cron job
 
-Creates or updates a cron job via the OpenClaw gateway API.
+Registers a cron job via `openclaw cron add`. Idempotent — skips if a job with the same name already exists.
 
 ```yaml
 - type: cron
   name: daily-healthcheck
-  job_file: cron/daily-healthcheck.json  # relative to files/
+  schedule: "0 9 * * *"
+  tz: America/New_York
+  session: isolated
+  message: "Run healthcheck"
+  timeout_seconds: 300
+  announce: true
 ```
 
-Where `files/cron/daily-healthcheck.json` is a full OpenClaw cron job definition:
-```json
-{
-  "name": "daily-healthcheck",
-  "schedule": { "kind": "cron", "expr": "0 9 * * *", "tz": "America/New_York" },
-  "payload": { "kind": "agentTurn", "message": "Run healthcheck", "timeoutSeconds": 300 },
-  "sessionTarget": "isolated",
-  "delivery": { "mode": "announce" },
-  "enabled": true
-}
-```
-
-**Current gap (v0.1):** The CLI just writes the JSON file to `~/.openclaw/workspace/cron-jobs/`. It doesn't actually call the gateway API to register the job. This is a known limitation — the cron job must be manually registered or registered by a subsequent `exec` step.
-
-**Target (v0.2):** Use `curl` to hit the gateway's cron API (`POST /api/cron/jobs`) to actually register/update the job. Requires the gateway to be running and accessible on localhost.
+**Rules:**
+- All cron fields are declared inline in the YAML manifest (no external JSON file).
+- `name`, `schedule`, and `message` are required; other fields are optional.
+- Checks `openclaw cron list --json` first — skips if job name already exists.
+- Requires `openclaw` CLI on the instance.
 
 ### 6. `exec` — Run a shell command
 
@@ -210,7 +252,7 @@ Escape hatch for anything the other step types can't handle.
 
 ### 7. `openclaw_update` — Update OpenClaw itself
 
-Updates the OpenClaw npm package.
+Calls `openclaw update --yes` to update OpenClaw. The CLI handles bun/npm detection automatically.
 
 ```yaml
 - type: openclaw_update
@@ -218,10 +260,9 @@ Updates the OpenClaw npm package.
 ```
 
 **Rules:**
-- `version: latest` or omitted → `npm install -g openclaw`
-- Specific version → `npm install -g openclaw@<version>`
+- `version` defaults to `latest`. Specific version is passed as `--tag`.
+- Requires `openclaw` CLI on the instance.
 - Should typically be followed by a `restart` step.
-- **Note:** Mac mini uses `bun` not `npm`. Need platform detection or configurable package manager.
 
 ### 8. `restart` — Restart the OpenClaw gateway
 
@@ -230,8 +271,8 @@ Updates the OpenClaw npm package.
 ```
 
 **Rules:**
-- Tries `systemctl --user restart openclaw-gateway` first (Linux/systemd).
-- Falls back to `openclaw gateway restart`.
+- Prefers `openclaw gateway restart`.
+- Falls back to `systemctl --user restart openclaw-gateway` if `openclaw` binary not available.
 - Non-fatal if restart fails (warns but doesn't stop the patch).
 
 ---
@@ -249,17 +290,10 @@ The CLI uses a hand-rolled mini YAML parser (grep/sed). This works for simple ke
 If we ever need real YAML parsing: `yq` is the obvious choice, but it's an extra dependency. `python3 -c 'import yaml; ...'` is available on most systems.
 
 ### Cron Job Registration
-The `cron` step currently just writes a JSON file. It doesn't register with the running gateway. Options:
-1. **exec step chaining** — follow `cron` step with `exec` that curls the gateway API
-2. **Built-in gateway API call** — the CLI calls `curl localhost:<port>/api/cron/jobs` directly
-3. **OpenClaw CLI** — `openclaw cron add --file <path>` (if this exists or gets added)
-
-**Decision for v1:** Option 1 (document the pattern). Option 2 for v1.1 once we know the gateway API shape reliably.
+Resolved. The `cron` step now uses `openclaw cron add` directly with inline fields (`--name`, `--cron`, `--message`, etc.). No external JSON files needed.
 
 ### Package Manager Detection
-Mac mini uses `bun`, EC2 uses `npm`. The `openclaw_update` step hardcodes `npm install -g`.
-
-**Decision:** Detect at runtime: if `bun` exists and openclaw was installed via bun, use `bun install -g`. Otherwise `npm install -g`. Check with `which openclaw` → resolve symlink → infer package manager.
+Resolved. The `openclaw_update` step now uses `openclaw update --yes`, which handles bun/npm detection internally.
 
 ### Transport: How `apply` Gets Triggered on Remote Instances
 The CLI is designed to run locally on each instance. Getting it to run on remote instances:

@@ -96,10 +96,13 @@ Then either run manually or set up a cron job for periodic sync.
 
 ```
 patches/           Patch manifests (YAML)
-files/             File contents referenced by patches
+files/             File contents referenced by file steps
+  workspace/       Workspace files (AGENTS.md, etc.)
+  cron/            Cron job definitions (JSON)
 skills/            Skill directories referenced by patches
 extensions/        Plugin extension directories referenced by patches
 scripts/           The openclaw-patch CLI
+tests/             Test suite
 docs/              Detailed documentation
 ```
 

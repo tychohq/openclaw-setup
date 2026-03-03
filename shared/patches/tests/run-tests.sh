@@ -457,6 +457,73 @@ test_no_merge_file_references() {
   [[ -z "$matches" ]]
 }
 
+test_no_config_patch_references() {
+  # Regression: config_patch step type was removed in v2.0.0.
+  # It should not appear in docs or YAML manifests (only meta/ and test files).
+  local repo_root
+  repo_root="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  local matches
+  matches="$(grep -r "config_patch" \
+    --include="*.sh" --include="*.yaml" --include="*.md" \
+    "$repo_root" 2>/dev/null \
+    | grep -v "node_modules" \
+    | grep -v "/meta/" \
+    | grep -v "run-tests\.sh" \
+    | grep -v "/tests/" \
+    || true)"
+  [[ -z "$matches" ]]
+}
+
+test_docs_no_stale_files_configs() {
+  # Regression: files/configs/ was removed after config_patch→config_set migration.
+  # Docs should not reference it.
+  local repo_root
+  repo_root="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  local matches
+  matches="$(grep -r "files/configs" \
+    --include="*.md" \
+    "$repo_root" 2>/dev/null \
+    | grep -v "node_modules" \
+    | grep -v "/meta/" \
+    | grep -v "run-tests\.sh" \
+    || true)"
+  [[ -z "$matches" ]]
+}
+
+test_step_reference_lists_all_step_types() {
+  # Ensure step-reference.md documents every step type the CLI handles.
+  local step_ref="$SCRIPT_DIR/../docs/step-reference.md"
+  local cli="$SCRIPT_DIR/../scripts/openclaw-patch"
+  [[ -f "$step_ref" ]] || return 1
+  [[ -f "$cli" ]] || return 1
+
+  # Extract step types from the CLI's exec_step case statement
+  local cli_types
+  cli_types="$(grep -oE '[a-z_]+\).*exec_step' "$cli" | sed 's/).*//' | sort)"
+
+  # Each CLI step type should appear in step-reference.md
+  while IFS= read -r stype; do
+    [[ -z "$stype" ]] && continue
+    grep -qi "\`$stype\`" "$step_ref" || return 1
+  done <<< "$cli_types"
+}
+
+test_readme_step_table_matches_cli() {
+  # Ensure patches/README.md step type table lists all step types from the CLI.
+  local readme="$SCRIPT_DIR/../README.md"
+  local cli="$SCRIPT_DIR/../scripts/openclaw-patch"
+  [[ -f "$readme" ]] || return 1
+  [[ -f "$cli" ]] || return 1
+
+  local cli_types
+  cli_types="$(grep -oE '[a-z_]+\).*exec_step' "$cli" | sed 's/).*//' | sort)"
+
+  while IFS= read -r stype; do
+    [[ -z "$stype" ]] && continue
+    grep -qi "\`$stype\`" "$readme" || return 1
+  done <<< "$cli_types"
+}
+
 test_extension_step() {
   setup
   # Mock openclaw that handles "plugins install <path>" by copying the dir
@@ -524,6 +591,10 @@ run_test "requires allows satisfied vars" test_requires_allows_satisfied_vars
 run_test "plugin_enable step"             test_plugin_enable_step
 run_test "extension step"                test_extension_step
 run_test "no merge_file references"      test_no_merge_file_references
+run_test "no config_patch references"    test_no_config_patch_references
+run_test "docs: no files/configs refs"   test_docs_no_stale_files_configs
+run_test "step-reference covers all types" test_step_reference_lists_all_step_types
+run_test "README step table matches CLI" test_readme_step_table_matches_cli
 
 echo ""
 echo "Results: $PASS/$TOTAL passed, $FAIL failed"

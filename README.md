@@ -12,6 +12,7 @@ openclaw-setup/
 │   ├── checklist/    # Deployment health check scripts
 │   ├── config/       # Config and env templates
 │   ├── cron-jobs/    # Cron job JSON definitions
+│   ├── patches/      # Declarative patch system (YAML manifests, CLI, tests)
 │   ├── scripts/      # Setup, bootstrap, and audit scripts
 │   ├── skills/       # Custom OpenClaw skills
 │   └── workspace/    # Workspace starter files (SOUL.md, docs, tools, etc.)
