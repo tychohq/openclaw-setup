@@ -227,16 +227,26 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
     BUNDLE_FILE=$(mktemp)
     echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d | gunzip > "$BUNDLE_FILE"
 
-    # Extract patches from the bundle and apply them
-    PATCHES=$(jq '.patches // []' "$BUNDLE_FILE")
-    PATCH_COUNT=$(echo "$PATCHES" | jq 'length')
+    # Extract patches from the bundle and apply their config content
+    # Each patch has .steps[].merge_file pointing to a key in .configs
+    PATCH_COUNT=$(jq '.patches | length' "$BUNDLE_FILE")
 
     if [ "$PATCH_COUNT" -gt 0 ]; then
         for i in $(seq 0 $((PATCH_COUNT - 1))); do
-            PATCH=$(echo "$PATCHES" | jq ".[$i].content // .[$i]")
-            CURRENT=$(cat "$OPENCLAW_JSON")
-            MERGED=$(echo -e "$CURRENT\n$PATCH" | jq -s '.[0] * .[1]')
-            echo "$MERGED" > "$OPENCLAW_JSON"
+            PATCH_ID=$(jq -r ".patches[$i].id // "patch-$i"" "$BUNDLE_FILE")
+            # Get merge_file references from steps
+            MERGE_FILES=$(jq -r ".patches[$i].steps[]? | select(.type == "config_patch") | .merge_file // empty" "$BUNDLE_FILE")
+            for MERGE_FILE in $MERGE_FILES; do
+                CONFIG_CONTENT=$(jq ".configs[\"$MERGE_FILE\"] // empty" "$BUNDLE_FILE")
+                if [ -n "$CONFIG_CONTENT" ] && [ "$CONFIG_CONTENT" != "null" ]; then
+                    CURRENT=$(cat "$OPENCLAW_JSON")
+                    MERGED=$(echo -e "$CURRENT\n$CONFIG_CONTENT" | jq -s '.[0] * .[1]')
+                    echo "$MERGED" > "$OPENCLAW_JSON"
+                    log "  Applied patch: $PATCH_ID ($MERGE_FILE)"
+                else
+                    log "  WARNING: No config content found for $MERGE_FILE in patch $PATCH_ID"
+                fi
+            done
         done
         log "Applied $PATCH_COUNT config patches from bundle."
     fi
