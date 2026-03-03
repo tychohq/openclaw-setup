@@ -1,9 +1,0 @@
-{
-  "channels": {
-    "signal": {
-      "enabled": true,
-      "dmPolicy": "allowlist",
-      "groupPolicy": "allowlist"
-    }
-  }
-}
