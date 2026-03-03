@@ -4,5 +4,18 @@ targets: ["*"]
 created: 2026-03-01T22:03:02Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/agent-permissions.json
+  - type: config_set
+    path: tools.exec.security
+    value: "full"
+
+  - type: config_set
+    path: tools.exec.ask
+    value: "off"
+
+  - type: config_set
+    path: tools.fs.workspaceOnly
+    value: "false"
+
+  - type: config_set
+    path: tools.elevated.enabled
+    value: "true"

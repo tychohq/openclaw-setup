@@ -4,5 +4,30 @@ targets: ["*"]
 created: 2026-03-01T22:00:00Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/agent-defaults.json
+  - type: config_set
+    path: agents.defaults.model
+    value: '{"primary":"anthropic/claude-opus-4-6","fallbacks":["openai-codex/gpt-5.3-codex"]}'
+
+  - type: config_set
+    path: agents.defaults.compaction
+    value: '{"reserveTokensFloor":80000}'
+
+  - type: config_set
+    path: agents.defaults.heartbeat
+    value: '{"every":"1h"}'
+
+  - type: config_set
+    path: agents.defaults.maxConcurrent
+    value: "6"
+
+  - type: config_set
+    path: agents.defaults.verboseDefault
+    value: "off"
+
+  - type: config_set
+    path: agents.defaults.blockStreamingDefault
+    value: "on"
+
+  - type: config_set
+    path: agents.defaults.contextPruning
+    value: '{"mode":"off","ttl":"1h"}'

@@ -14,5 +14,14 @@ steps:
     path: channels.signal.allowFrom
     value: '["$SIGNAL_PHONE_NUMBER"]'
 
-  - type: config_patch
-    merge_file: configs/signal-channel.json
+  - type: config_set
+    path: channels.signal.enabled
+    value: "true"
+
+  - type: config_set
+    path: channels.signal.dmPolicy
+    value: "allowlist"
+
+  - type: config_set
+    path: channels.signal.groupPolicy
+    value: "allowlist"

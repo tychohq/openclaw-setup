@@ -4,5 +4,10 @@ targets: ["*"]
 created: 2026-03-01T22:11:00Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/security-config.json
+  - type: config_set
+    path: discovery.wideArea.enabled
+    value: "false"
+
+  - type: config_set
+    path: discovery.mdns.mode
+    value: "minimal"

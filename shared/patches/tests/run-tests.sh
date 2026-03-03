@@ -169,6 +169,88 @@ test_config_set() {
   teardown
 }
 
+test_config_append() {
+  setup
+  # Need a mock that handles config get + config set with real JSON
+  mkdir -p "$TEST_HOME"
+  echo '{"skills":{"load":{"extraDirs":["existing-dir"]}}}' > "$TEST_HOME/openclaw.json"
+  cat > "$MOCK_BIN/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+CONFIG="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_HOME/openclaw.json}"
+if [[ "$1" == "config" && "$2" == "get" ]]; then
+  path="$3"
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  jq "getpath($jq_path)" "$CONFIG"
+  exit 0
+fi
+if [[ "$1" == "config" && "$2" == "set" ]]; then
+  path="$3"
+  value="$4"
+  tmp=$(mktemp)
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  if echo "$value" | jq empty 2>/dev/null; then
+    jq --argjson v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  else
+    jq --arg v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  fi
+  exit 0
+fi
+if [[ "$1" == "cron" && "$2" == "list" && "$*" == *"--json"* ]]; then
+  echo "[]"
+fi
+MOCK
+  chmod +x "$MOCK_BIN/openclaw"
+  export PATH="$MOCK_BIN:$PATH"
+  load_patch test-config-append.yaml
+  apply test-instance >/dev/null
+  # New value should be present
+  jq -e '.skills.load.extraDirs | index("~/.agents/skills")' "$TEST_HOME/openclaw.json" >/dev/null
+  # Existing value should be preserved
+  jq -e '.skills.load.extraDirs | index("existing-dir")' "$TEST_HOME/openclaw.json" >/dev/null
+  teardown
+}
+
+test_config_append_idempotent() {
+  setup
+  # Start with the value already present
+  mkdir -p "$TEST_HOME"
+  echo '{"skills":{"load":{"extraDirs":["~/.agents/skills"]}}}' > "$TEST_HOME/openclaw.json"
+  cat > "$MOCK_BIN/openclaw" << 'MOCK'
+#!/usr/bin/env bash
+CONFIG="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_HOME/openclaw.json}"
+if [[ "$1" == "config" && "$2" == "get" ]]; then
+  path="$3"
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  jq "getpath($jq_path)" "$CONFIG"
+  exit 0
+fi
+if [[ "$1" == "config" && "$2" == "set" ]]; then
+  path="$3"
+  value="$4"
+  tmp=$(mktemp)
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  if echo "$value" | jq empty 2>/dev/null; then
+    jq --argjson v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  else
+    jq --arg v "$value" "setpath($jq_path; \$v)" "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+  fi
+  exit 0
+fi
+if [[ "$1" == "cron" && "$2" == "list" && "$*" == *"--json"* ]]; then
+  echo "[]"
+fi
+MOCK
+  chmod +x "$MOCK_BIN/openclaw"
+  export PATH="$MOCK_BIN:$PATH"
+  load_patch test-config-append.yaml
+  apply test-instance >/dev/null
+  # Should have exactly 1 entry (deduplicated)
+  local count
+  count=$(jq '.skills.load.extraDirs | length' "$TEST_HOME/openclaw.json")
+  [[ "$count" -eq 1 ]]
+  teardown
+}
+
 test_mkdir_step() {
   setup
   load_patch test-mkdir-step.yaml
@@ -437,6 +519,8 @@ run_test "file step (marker idempotent)"  test_file_step_append_marker_idempoten
 run_test "config_patch (existing config)" test_config_patch_existing
 run_test "config_patch (missing config)"  test_config_patch_missing_config
 run_test "config_set"                     test_config_set
+run_test "config_append"                  test_config_append
+run_test "config_append (idempotent)"     test_config_append_idempotent
 run_test "mkdir step"                     test_mkdir_step
 run_test "skill step"                     test_skill_step
 run_test "cron step (openclaw CLI)"       test_cron_step

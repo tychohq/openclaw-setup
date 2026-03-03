@@ -1,0 +1,9 @@
+id: test-config-append
+description: "Test config_append step"
+targets: ["*"]
+created: 2026-01-01T00:00:00Z
+
+steps:
+  - type: config_append
+    path: skills.load.extraDirs
+    value: '["~/.agents/skills"]'

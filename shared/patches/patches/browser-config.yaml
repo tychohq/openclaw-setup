@@ -4,5 +4,6 @@ targets: ["*"]
 created: 2026-03-01T22:10:00Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/browser-config.json
+  - type: config_set
+    path: browser.headless
+    value: "false"

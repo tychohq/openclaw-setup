@@ -7,5 +7,6 @@ requires:
   - PERPLEXITY_API_KEY
 
 steps:
-  - type: config_patch
-    merge_file: configs/web-search.json
+  - type: config_set
+    path: tools.web.search.provider
+    value: "perplexity"

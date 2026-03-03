@@ -7,5 +7,10 @@ requires:
   - OPENAI_API_KEY
 
 steps:
-  - type: config_patch
-    merge_file: configs/audio-transcription.json
+  - type: config_set
+    path: tools.media.audio.enabled
+    value: "true"
+
+  - type: config_append
+    path: tools.media.audio.models
+    value: '[{"type":"provider","provider":"openai","model":"whisper-1"}]'

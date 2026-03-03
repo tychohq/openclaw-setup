@@ -4,5 +4,18 @@ targets: ["*"]
 created: 2026-03-01T22:02:00Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/session-config.json
+  - type: config_set
+    path: session.dmScope
+    value: "per-channel-peer"
+
+  - type: config_set
+    path: session.reset
+    value: '{"mode":"idle","idleMinutes":525600}'
+
+  - type: config_set
+    path: session.threadBindings
+    value: '{"enabled":true,"idleHours":24}'
+
+  - type: config_set
+    path: messages.queue.mode
+    value: "steer"

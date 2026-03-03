@@ -4,5 +4,10 @@ targets: ["*"]
 created: 2026-03-01T22:03:03Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/agent-collaboration.json
+  - type: config_set
+    path: tools.sessions.visibility
+    value: "all"
+
+  - type: config_set
+    path: tools.agentToAgent.enabled
+    value: "true"

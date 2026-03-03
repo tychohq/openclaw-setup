@@ -186,6 +186,7 @@ exec_step() {
     file)            exec_step_file "$step_file" ;;
     config_patch)    exec_step_config_patch "$step_file" ;;
     config_set)      exec_step_config_set "$step_file" ;;
+    config_append)   exec_step_config_append "$step_file" ;;
     plugin_enable)   exec_step_plugin_enable "$step_file" ;;
     skill)           exec_step_skill "$step_file" ;;
     extension)       exec_step_extension "$step_file" ;;
@@ -306,6 +307,33 @@ exec_step_config_set() {
   info "Setting config: $cfg_path = $cfg_value"
   if ! OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw config set "$cfg_path" "$cfg_value"; then
     die "config_set failed: openclaw config set $cfg_path"
+  fi
+}
+
+exec_step_config_append() {
+  local step_file="$1"
+  need_cmd openclaw
+  need_cmd jq
+
+  local cfg_path cfg_value
+  cfg_path="$(yaml_get "$step_file" "path")"
+  cfg_value="$(yaml_get "$step_file" "value")"
+
+  [[ -z "$cfg_path" ]] && die "config_append step missing 'path'"
+  [[ -z "$cfg_value" ]] && die "config_append step missing 'value'"
+
+  cfg_path="$(expand_env_vars "$cfg_path")"
+  cfg_value="$(expand_env_vars "$cfg_value")"
+
+  local existing
+  existing=$(OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw config get "$cfg_path" 2>/dev/null || echo '[]')
+
+  local merged
+  merged=$(echo "$existing" | jq --argjson new "$cfg_value" '$new + . | unique')
+
+  info "Appending to config: $cfg_path"
+  if ! OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw config set "$cfg_path" "$merged"; then
+    die "config_append failed: openclaw config set $cfg_path"
   fi
 }
 
@@ -591,8 +619,9 @@ steps:
   #   path: models.default
   #   value: "anthropic/claude-sonnet-4-20250514"
 
-  # - type: config_patch
-  #   merge_file: example-config.json
+  # - type: config_append
+  #   path: skills.load.extraDirs
+  #   value: '["~/.agents/skills"]'
 
   # - type: mkdir
   #   paths:
@@ -746,7 +775,7 @@ cmd_validate() {
             errors=$((errors + 1))
           fi
           ;;
-        file|config_set|plugin_enable|extension|clawhub|cron|exec|mkdir|openclaw_update|restart)
+        file|config_set|config_append|plugin_enable|extension|clawhub|cron|exec|mkdir|openclaw_update|restart)
           # Known types — no extra validation needed here
           ;;
         *)

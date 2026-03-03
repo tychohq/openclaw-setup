@@ -4,5 +4,6 @@ targets: ["*"]
 created: 2026-03-01T22:09:00Z
 
 steps:
-  - type: config_patch
-    merge_file: configs/skills-config.json
+  - type: config_append
+    path: skills.load.extraDirs
+    value: '["~/.agents/skills"]'

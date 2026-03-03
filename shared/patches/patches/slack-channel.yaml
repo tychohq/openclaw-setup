@@ -16,5 +16,18 @@ steps:
     path: channels.slack.allowFrom
     value: '["$SLACK_OWNER_USER_ID"]'
 
-  - type: config_patch
-    merge_file: configs/slack-channel.json
+  - type: config_set
+    path: channels.slack.enabled
+    value: "true"
+
+  - type: config_set
+    path: channels.slack.dmPolicy
+    value: "allowlist"
+
+  - type: config_set
+    path: channels.slack.groupPolicy
+    value: "allowlist"
+
+  - type: config_set
+    path: channels.slack.streaming
+    value: "off"

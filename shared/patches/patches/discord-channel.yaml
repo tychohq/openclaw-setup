@@ -24,5 +24,22 @@ steps:
     path: channels.discord.guilds.$DISCORD_GUILD_ID.users
     value: '["$DISCORD_OWNER_ID"]'
 
-  - type: config_patch
-    merge_file: configs/discord-channel.json
+  - type: config_set
+    path: channels.discord.enabled
+    value: "true"
+
+  - type: config_set
+    path: channels.discord.groupPolicy
+    value: "allowlist"
+
+  - type: config_set
+    path: channels.discord.streaming
+    value: "off"
+
+  - type: config_set
+    path: channels.discord.dmPolicy
+    value: "allowlist"
+
+  - type: config_set
+    path: channels.discord.threadBindings
+    value: '{"enabled":true,"spawnAcpSessions":true}'

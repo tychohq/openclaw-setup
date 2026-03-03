@@ -27,8 +27,9 @@ cleanup() {
 trap cleanup EXIT
 
 # ── Mock openclaw binary ──
-# Handles `plugins enable` (jq merge) and `config set` (jq setpath)
-# so the integration test doesn't need the real openclaw CLI.
+# Handles `plugins enable` (jq merge), `config get` (jq getpath),
+# and `config set` (jq setpath) so the integration test doesn't
+# need the real openclaw CLI.
 cat > "$MOCK_BIN/openclaw" << 'MOCK'
 #!/usr/bin/env bash
 CONFIG="${OPENCLAW_CONFIG_PATH:-$OPENCLAW_HOME/openclaw.json}"
@@ -38,6 +39,13 @@ if [[ "${1:-}" == "plugins" && "${2:-}" == "enable" ]]; then
   tmp=$(mktemp)
   jq --arg p "$plugin" '.plugins.entries[$p] = {"enabled": true}' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
   echo "Enabled plugin \"$plugin\"."
+  exit 0
+fi
+
+if [[ "${1:-}" == "config" && "${2:-}" == "get" ]]; then
+  path="${3:?missing path}"
+  jq_path=$(echo "$path" | sed 's/\./","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  jq "getpath($jq_path)" "$CONFIG"
   exit 0
 fi
 
@@ -108,6 +116,7 @@ export SIGNAL_PHONE_NUMBER="test-dummy"
 export SLACK_BOT_TOKEN="test-dummy"
 export SLACK_APP_TOKEN="test-dummy"
 export SLACK_OWNER_USER_ID="test-dummy"
+export PERPLEXITY_API_KEY="test-dummy"
 
 # ── Step 2: Apply all patches ──
 info "Applying all patches with deployment=$DEPLOYMENT"
@@ -148,7 +157,7 @@ CHECKS=(
   # model-providers
   '.models.mode == "merge"'
 
-  # discord-channel (config_patch sets entries + channel settings)
+  # discord-channel
   '.plugins.entries.discord.enabled == true'
   '.channels.discord.enabled == true'
   '.channels.discord.groupPolicy == "allowlist"'
@@ -168,7 +177,7 @@ CHECKS=(
   '(.channels.slack.allowFrom | length) > 0'
 
   # skills-config
-  '.skills.install.nodeManager == "bun"'
+  '(.skills.load.extraDirs | length) > 0'
 
   # browser-config
   '.browser.headless == false'
