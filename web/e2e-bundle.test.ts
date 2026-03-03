@@ -260,7 +260,29 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     expect(config.patches).toHaveLength(1);
   });
 
-  test('all 12 catalog patches can be loaded and selected', () => {
+  test('config_set and config_append steps carry path and value directly', () => {
+    loadPatchesIntoState(['browser-config', 'skills-config']);
+    const state = g('state');
+    state.selected.add('browser-config');
+    state.selected.add('skills-config');
+
+    const files = g('buildBundleFiles')();
+    const config = JSON.parse(files['config-bundle.json']);
+
+    // browser-config has a config_set step
+    const browserPatch = config.patches.find((p: any) => p.id === 'browser-config');
+    const setStep = browserPatch.steps.find((s: any) => s.type === 'config_set');
+    expect(setStep.path).toBe('browser.headless');
+    expect(setStep.value).toContain('false');
+
+    // skills-config has a config_append step
+    const skillsPatch = config.patches.find((p: any) => p.id === 'skills-config');
+    const appendStep = skillsPatch.steps.find((s: any) => s.type === 'config_append');
+    expect(appendStep.path).toBe('skills.load.extraDirs');
+    expect(appendStep.value).toBeTruthy();
+  });
+
+  test('all catalog patches can be loaded and selected', () => {
     loadPatchesIntoState(patchCatalog);
     const state = g('state');
 
@@ -277,6 +299,16 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
 
     // No configs map in v2.0.0 bundle format
     expect(config.configs).toBeUndefined();
+
+    // Every config_set/config_append step must have path and value
+    for (const patch of config.patches) {
+      for (const step of patch.steps) {
+        if (step.type === 'config_set' || step.type === 'config_append') {
+          expect(step.path).toBeTruthy();
+          expect(step.value).toBeDefined();
+        }
+      }
+    }
   });
 });
 
