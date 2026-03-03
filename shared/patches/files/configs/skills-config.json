@@ -4,9 +4,6 @@
       "extraDirs": [
         "~/.agents/skills"
       ]
-    },
-    "install": {
-      "nodeManager": "npm"
     }
   }
 }
