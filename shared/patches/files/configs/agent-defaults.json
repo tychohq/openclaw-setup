@@ -8,7 +8,6 @@
         ]
       },
       "compaction": {
-        "mode": "default",
         "reserveTokensFloor": 80000
       },
       "heartbeat": {
