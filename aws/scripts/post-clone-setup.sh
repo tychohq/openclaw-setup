@@ -235,9 +235,9 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
         for i in $(seq 0 $((PATCH_COUNT - 1))); do
             PATCH_ID=$(jq -r ".patches[$i].id" "$BUNDLE_FILE")
             # Get merge_file references from steps
-            MERGE_FILES=$(jq -r ".patches[$i].steps[]? | select(.type == "config_patch") | .merge_file // empty" "$BUNDLE_FILE")
+            MERGE_FILES=$(jq -r ".patches[$i].steps[]?" "$BUNDLE_FILE" | jq -r 'select(.type == "config_patch") | .merge_file // empty')
             for MERGE_FILE in $MERGE_FILES; do
-                CONFIG_CONTENT=$(jq ".configs[\"$MERGE_FILE\"] // empty" "$BUNDLE_FILE")
+                CONFIG_CONTENT=$(jq --arg f "$MERGE_FILE" '.configs[$f] // empty' "$BUNDLE_FILE")
                 if [ -n "$CONFIG_CONTENT" ] && [ "$CONFIG_CONTENT" != "null" ]; then
                     CURRENT=$(cat "$OPENCLAW_JSON")
                     MERGED=$(echo -e "$CURRENT\n$CONFIG_CONTENT" | jq -s '.[0] * .[1]')
