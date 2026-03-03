@@ -31,6 +31,10 @@ env_get() {
   # Strip optional surrounding double quotes
   val="${val%\"}"
   val="${val#\"}"
+  # Treat empty strings as unset
+  if [ -z "$val" ]; then
+    return
+  fi
   echo "$val"
 }
 
@@ -184,8 +188,7 @@ if [ ! -f "$OPENCLAW_JSON" ] || [ "$(cat "$OPENCLAW_JSON")" = "{}" ]; then
         CONFIG=$(echo "$CONFIG" | jq --arg pw "$GOG_KP" '.env.vars.GOG_KEYRING_PASSWORD = $pw')
     fi
 
-    # Set default model based on available API keys
-    # Bedrock first (cheaper), then direct Anthropic, then OpenAI
+    # Set default model based on available API keys (first non-empty match wins)
     ANTHROPIC_API_KEY="$(env_get ANTHROPIC_API_KEY)"
     OPENAI_API_KEY="$(env_get OPENAI_API_KEY)"
     DEFAULT_MODEL=""
@@ -255,6 +258,51 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
     rm -f "$BUNDLE_FILE"
 fi
 
+# ── 4c. Generate auth-profiles.json for agent providers ──────────────────────
+
+log "Step 4c: Generating auth-profiles.json..."
+
+AUTH_DIR="$OPENCLAW_DIR/agents/main/agent"
+mkdir -p "$AUTH_DIR"
+AUTH_FILE="$AUTH_DIR/auth-profiles.json"
+
+# Build auth profiles from non-empty API keys in .env
+python3 << 'AUTH_PY'
+import json, subprocess, os
+
+def env_get(key):
+    """Read a key from .env file, stripping quotes."""
+    env_file = os.path.expanduser("~/.openclaw/.env")
+    with open(env_file) as f:
+        for line in f:
+            if line.startswith(f"{key}="):
+                val = line.strip().split("=", 1)[1]
+                return val.strip('"').strip("'")
+    return ""
+
+profiles = {}
+
+anthropic_key = env_get("ANTHROPIC_API_KEY")
+if anthropic_key:
+    profiles["anthropic"] = {"apiKey": anthropic_key}
+
+openai_key = env_get("OPENAI_API_KEY")
+if openai_key:
+    profiles["openai"] = {"apiKey": openai_key}
+    profiles["openai-codex"] = {"apiKey": openai_key}
+
+# Bedrock uses aws-sdk auth (env vars), no auth profile needed
+
+auth_file = os.path.expanduser("~/.openclaw/agents/main/agent/auth-profiles.json")
+with open(auth_file, "w") as f:
+    json.dump(profiles, f, indent=2)
+
+os.chmod(auth_file, 0o600)
+print(f"Auth profiles: {', '.join(profiles.keys()) or 'none (Bedrock-only)'}")
+AUTH_PY
+
+log "auth-profiles.json generated."
+
 # ── 5. Run bootstrap-openclaw-workspace.sh ───────────────────────────────────
 
 log "Step 5: Bootstrapping workspace..."
@@ -297,10 +345,10 @@ if [ -n "$CLAWHUB_SKILLS" ]; then
       skill="${skill## }"
       skill="${skill%% }"
       [ -z "$skill" ] && continue
-      if [ -d "$HOME/.agents/skills/$skill" ]; then
+      if [ -d "$OPENCLAW_DIR/skills/$skill" ]; then
         log "  Skill $skill already installed — skipping."
       else
-        clawhub install "$skill" 2>&1 || log "  WARNING: Failed to install skill: $skill"
+        clawhub install "$skill" --force --dir "$OPENCLAW_DIR/skills" 2>&1 || log "  WARNING: Failed to install skill: $skill"
       fi
     done
     log "ClawHub skill installation complete."
