@@ -7,7 +7,7 @@
     },
     "threadBindings": {
       "enabled": true,
-      "ttlHours": 24
+      "idleHours": 24
     }
   },
   "messages": {
