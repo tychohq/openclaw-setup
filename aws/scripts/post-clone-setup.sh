@@ -233,7 +233,7 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
 
     if [ "$PATCH_COUNT" -gt 0 ]; then
         for i in $(seq 0 $((PATCH_COUNT - 1))); do
-            PATCH_ID=$(jq -r ".patches[$i].id // "patch-$i"" "$BUNDLE_FILE")
+            PATCH_ID=$(jq -r ".patches[$i].id" "$BUNDLE_FILE")
             # Get merge_file references from steps
             MERGE_FILES=$(jq -r ".patches[$i].steps[]? | select(.type == "config_patch") | .merge_file // empty" "$BUNDLE_FILE")
             for MERGE_FILE in $MERGE_FILES; do
