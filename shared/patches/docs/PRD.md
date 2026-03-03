@@ -288,7 +288,7 @@ This is intentional — rollback adds significant complexity and git already pro
 ### Task 1: Scaffold repo structure
 Create the missing directories and placeholder files.
 
-- [ ] Create `patches/`, `files/configs/`, `files/workspace/`, `files/cron/`, `skills/`, `tests/fixtures/`, `docs/` directories
+- [ ] Create `patches/`, `files/workspace/`, `files/cron/`, `skills/`, `tests/fixtures/`, `docs/` directories
 - [ ] Add `.gitkeep` to empty dirs so git tracks them
 - [ ] Create `docs/step-reference.md` with the step type documentation from this PRD
 - [ ] Create a project `AGENTS.md` (`.agents/agents.md`) with repo-specific coding instructions

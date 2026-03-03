@@ -192,6 +192,18 @@ describe('E2E: full bundle with real data', () => {
     try { readdirSync(configsDir); } catch { exists = false; }
     expect(exists).toBe(false);
   });
+
+  test('no runtime source files reference files/configs/', () => {
+    const runtimeFiles = [
+      resolve(projectRoot, 'web/index.html'),
+      resolve(projectRoot, 'aws/scripts/post-clone-setup.sh'),
+      resolve(projectRoot, 'shared/patches/scripts/openclaw-patch'),
+    ];
+    for (const file of runtimeFiles) {
+      const content = readFileSync(file, 'utf-8');
+      expect(content).not.toContain('files/configs');
+    }
+  });
 });
 
 describe('E2E: select patches + bundled skills → config-bundle.json', () => {

@@ -9,7 +9,7 @@ A single self-contained `index.html` that displays the OpenClaw Setup catalog â€
 - **js-yaml via CDN** for parsing YAML manifests in-browser
 - **No framework, no build step, no compilation**
 - **Two data modes** (auto-detected):
-  - **Local mode:** When URL contains `?local=true`, fetches from relative paths (`../shared/patches/patches/`, `../shared/patches/files/configs/`, etc.) â€” requires a static file server like `bunx serve`
+  - **Local mode:** When URL contains `?local=true`, fetches from relative paths (`../shared/patches/patches/`, etc.) â€” requires a static file server like `bunx serve`
   - **GitHub mode (default):** Fetches from GitHub API (`https://api.github.com/repos/tychohq/openclaw-setup/contents/...`) using raw content URLs
 
 ## Data Sources
@@ -17,13 +17,8 @@ A single self-contained `index.html` that displays the OpenClaw Setup catalog â€
 ### Patches (primary)
 - Source: `shared/patches/patches/*.yaml`
 - Each YAML file is a patch manifest with: `id`, `description`, `targets`, `created`, `steps[]`
-- Steps reference config JSON files in `shared/patches/files/configs/`
-- Display: card per patch showing id, description, step types, which config keys it touches
-
-### Config Files (detail view for patches)
-- Source: `shared/patches/files/configs/*.json`
-- These are the actual config merge payloads
-- Display: expandable JSON preview when clicking a patch card
+- Steps use `config_set` and `config_append` to modify config via CLI
+- Display: card per patch showing id, description, step types
 
 ### Cron Jobs
 - Source: `shared/patches/files/cron/` (currently empty â€” `.gitkeep` only)
@@ -46,7 +41,7 @@ A single self-contained `index.html` that displays the OpenClaw Setup catalog â€
 Each patch displays:
 - **Title** (the patch `id` in human-readable form, e.g. "agent-defaults" â†’ "Agent Defaults")
 - **Description** from YAML
-- **Tags/badges** for step types (config_patch, exec, restart, etc.)
+- **Tags/badges** for step types (config_set, config_append, exec, restart, etc.)
 - **Expandable detail** showing:
   - Full step list
   - JSON config preview (syntax highlighted or formatted)
@@ -58,9 +53,8 @@ Each patch displays:
 - "Select All" / "Deselect All" buttons
 - Floating/sticky "Download Bundle" button (shows count of selected)
 - Download generates a JSON file containing:
-  - Selected patch manifests
-  - Referenced config files (embedded)
-  - A `manifest.json` with metadata (timestamp, version, selection list)
+  - Selected patch manifests (with config_set/config_append steps)
+  - A `manifest` with metadata (timestamp, version, selection list)
 
 ### Empty States
 - Cron jobs: "No cron job templates yet. Check back soon."
