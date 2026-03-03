@@ -1831,12 +1831,12 @@ fi
 # post-clone-setup.sh reads these on the EC2 instance.
 if [ -f /tmp/openclaw-env ]; then
     if [ -n "${DEPLOY_DIR:-}" ]; then
-        # Config bundle (openclaw.json patches)
+        # Config bundle (openclaw.json patches) — gzip before base64 to fit 16KB user_data limit
         if [ -f "$DEPLOY_DIR/config-bundle.json" ]; then
-            CONFIG_B64=$(base64 < "$DEPLOY_DIR/config-bundle.json" | tr -d '\n')
+            CONFIG_B64=$(gzip -c "$DEPLOY_DIR/config-bundle.json" | base64 | tr -d '\n')
             echo "" >> /tmp/openclaw-env
             echo "CONFIG_BUNDLE_B64=$CONFIG_B64" >> /tmp/openclaw-env
-            echo -e "  Config bundle: ${GREEN}✓ encoded${NC}"
+            echo -e "  Config bundle: ${GREEN}✓ encoded (gzip+b64)${NC}"
         fi
 
         # Cron job selections

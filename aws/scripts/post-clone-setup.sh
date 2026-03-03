@@ -225,7 +225,7 @@ fi
 CONFIG_BUNDLE_B64_VAL="$(env_get CONFIG_BUNDLE_B64)"
 if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
     BUNDLE_FILE=$(mktemp)
-    echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d > "$BUNDLE_FILE"
+    echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d | gunzip > "$BUNDLE_FILE"
 
     # Extract patches from the bundle and apply them
     PATCHES=$(jq '.patches // []' "$BUNDLE_FILE")
