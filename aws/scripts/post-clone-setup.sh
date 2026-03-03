@@ -231,28 +231,44 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
     BUNDLE_FILE=$(mktemp)
     echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d | gunzip > "$BUNDLE_FILE"
 
-    # Apply config patches: extract all config values from bundle and deep-merge into openclaw.json
-    # Uses a single jq call to avoid shell quoting issues
-    MERGED=$(jq -s '
-      .[0] as $bundle | .[1] as $base |
-      [$bundle.patches[]?.steps[]? | select(.type == "config_patch") | .merge_file] |
-      unique |
-      reduce .[] as $f ($base; . * ($bundle.configs[$f] // {}))
-    ' "$BUNDLE_FILE" "$OPENCLAW_JSON")
-
-    if [ -n "$MERGED" ] && [ "$MERGED" != "null" ]; then
-        echo "$MERGED" > "$OPENCLAW_JSON"
-        PATCH_NAMES=$(jq -r '[.patches[].id] | join(", ")' "$BUNDLE_FILE")
-        log "Applied config patches: $PATCH_NAMES"
-    fi
+    # Process all patch steps from bundle
+    jq -c '.patches[].steps[]' "$BUNDLE_FILE" | while read -r step; do
+      step_type=$(echo "$step" | jq -r '.type')
+      case "$step_type" in
+        config_set)
+          path=$(echo "$step" | jq -r '.path')
+          value=$(echo "$step" | jq -r '.value | if type == "string" then . else tojson end')
+          openclaw config set "$path" "$value"
+          log "Config set: $path"
+          ;;
+        config_append)
+          path=$(echo "$step" | jq -r '.path')
+          new_values=$(echo "$step" | jq -c '.value')
+          existing=$(openclaw config get "$path" 2>/dev/null || echo '[]')
+          merged=$(echo "$existing" | jq --argjson new "$new_values" '$new + . | unique')
+          openclaw config set "$path" "$merged"
+          log "Config append: $path"
+          ;;
+        plugin_enable)
+          plugin=$(echo "$step" | jq -r '.plugin')
+          openclaw plugins enable "$plugin"
+          log "Plugin enabled: $plugin"
+          ;;
+        *)
+          log "Skipping step type: $step_type"
+          ;;
+      esac
+    done
+    PATCH_NAMES=$(jq -r '[.patches[].id] | join(", ")' "$BUNDLE_FILE")
+    log "Applied patches: $PATCH_NAMES"
 
     # Handle bundled skills allowlist
-    BUNDLED_SKILLS=$(jq -r '.manifest.selectedBundledSkills // [] | .[]' "$BUNDLE_FILE" 2>/dev/null)
-    if [ -n "$BUNDLED_SKILLS" ]; then
-        SKILLS_JSON=$(echo "$BUNDLED_SKILLS" | jq -R . | jq -s .)
-        CURRENT=$(cat "$OPENCLAW_JSON")
-        echo "$CURRENT" | jq --argjson skills "$SKILLS_JSON" '.skills.allowBundled = $skills' > "$OPENCLAW_JSON"
-        log "Set bundled skills allowlist: $(echo "$BUNDLED_SKILLS" | tr '\n' ', ')"
+    BUNDLED=$(jq -c '.allowBundled // []' "$BUNDLE_FILE")
+    if [ "$BUNDLED" != "[]" ]; then
+        existing=$(openclaw config get skills.allowBundled 2>/dev/null || echo '[]')
+        merged=$(echo "$existing" | jq --argjson new "$BUNDLED" '$new + . | unique')
+        openclaw config set skills.allowBundled "$merged"
+        log "Set bundled skills allowlist"
     fi
 
     rm -f "$BUNDLE_FILE"

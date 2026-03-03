@@ -28,7 +28,6 @@
     .json-number { color: #fbbf24; }
     .json-bool { color: #f472b6; }
     .json-null { color: #9ca3af; }
-    .badge-config_patch { background: #312e81; color: #a5b4fc; }
     .badge-exec { background: #7c2d12; color: #fdba74; }
     .badge-restart { background: #164e63; color: #67e8f9; }
     .badge-copy { background: #1e3a2f; color: #6ee7b7; }
@@ -187,9 +186,8 @@
 <script>
 // ── State ──
 const state = {
-  patches: [],       // {id, description, targets, created, steps[], configData?}
+  patches: [],       // {id, description, targets, created, steps[]}
   selected: new Set(),
-  configs: {},       // id → parsed JSON
   cronJobs: [],      // loaded cron job objects
   cronSelected: new Set(),
   skills: [],          // loaded ClawHub skill objects
@@ -253,20 +251,13 @@ async function loadPatch(id) {
   return jsyaml.load(text);
 }
 
-async function loadConfig(filename) {
-  const url = rawUrl(`shared/patches/files/${filename}`);
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  return await res.json();
-}
-
 // ── Rendering ──
 function humanize(id) {
   return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function badgeClass(type) {
-  const known = ['config_patch', 'exec', 'restart', 'copy'];
+  const known = ['exec', 'restart', 'copy'];
   return known.includes(type) ? `badge-${type}` : 'badge-default';
 }
 
@@ -305,7 +296,7 @@ function renderPatchCard(patch) {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <h3 class="font-medium text-white text-sm">${humanize(patch.id)}</h3>
-            ${stepTypes.filter(t => t !== 'config_patch').map(t => `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${badgeClass(t)}">${t}</span>`).join('')}
+            ${stepTypes.map(t => `<span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${badgeClass(t)}">${t}</span>`).join('')}
           </div>
           <p class="text-gray-400 text-sm mt-1">${patch.description}</p>
           ${(patch.requires && patch.requires.length) ? `
@@ -333,12 +324,9 @@ function renderPatchCard(patch) {
           <div class="mb-2 rounded bg-black/30 p-2">
             <div class="flex items-center gap-2 mb-1">
               <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${badgeClass(step.type)}">${step.type}</span>
-              ${step.merge_file ? `<span class="text-xs text-gray-500 font-mono">${step.merge_file}</span>` : ''}
+              ${step.path ? `<span class="text-xs text-gray-500 font-mono">${escapeHtml(step.path)}</span>` : ''}
               ${step.command ? `<span class="text-xs text-gray-500 font-mono truncate max-w-md">${escapeHtml(step.command)}</span>` : ''}
             </div>
-            ${step.merge_file && state.configs[patch.id + '-' + i] ? `
-              <pre class="text-xs mt-1 overflow-x-auto leading-relaxed">${syntaxHighlight(state.configs[patch.id + '-' + i])}</pre>
-            ` : ''}
           </div>
         `).join('')}
       </div>
@@ -430,23 +418,12 @@ function switchTab(tab) {
 // ── Download Bundle ──
 function buildBundleFiles() {
   const selectedPatches = state.patches.filter(p => state.selected.has(p.id));
-  const embeddedConfigs = {};
-
-  for (const patch of selectedPatches) {
-    for (let i = 0; i < patch.steps.length; i++) {
-      const key = patch.id + '-' + i;
-      if (state.configs[key]) {
-        embeddedConfigs[patch.steps[i].merge_file] = state.configs[key];
-      }
-    }
-  }
-
   const selectedCronJobs = state.cronJobs.filter(j => state.cronSelected.has(j.name));
   const selectedSkills = state.skills.filter(s => state.skillsSelected.has(s.slug));
 
   const configBundle = {
     manifest: {
-      version: '1.0.0',
+      version: '2.0.0',
       generated: new Date().toISOString(),
       source: LOCAL ? 'local' : `github:${GITHUB_REPO}`,
       selectedPatches: [...state.selected],
@@ -455,7 +432,6 @@ function buildBundleFiles() {
       selectedBundledSkills: [...state.bundledSelected],
     },
     patches: selectedPatches,
-    configs: embeddedConfigs,
   };
 
   if (state.bundledSelected.size > 0) {
@@ -961,23 +937,6 @@ async function init() {
     }));
     const patches = (await Promise.all(patchPromises)).filter(Boolean);
     state.patches = patches;
-
-    // Load all config files in parallel
-    const configPromises = [];
-    for (const patch of patches) {
-      for (let i = 0; i < patch.steps.length; i++) {
-        const step = patch.steps[i];
-        if (step.merge_file) {
-          const key = patch.id + '-' + i;
-          configPromises.push(
-            loadConfig(step.merge_file).then(data => {
-              if (data) state.configs[key] = data;
-            }).catch(() => {})
-          );
-        }
-      }
-    }
-    await Promise.all(configPromises);
 
     loadingEl.remove();
     renderAllPatches();

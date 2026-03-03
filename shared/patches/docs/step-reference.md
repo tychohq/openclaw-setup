@@ -50,7 +50,7 @@ Append mode with idempotent marker:
 
 ## 2. `config_set` — Set a single config field
 
-Calls `openclaw config set <path> <value>` for individual config fields. Simpler than `config_patch` for basic changes.
+Calls `openclaw config set <path> <value>` for individual config fields.
 
 ```yaml
 - type: config_set
@@ -79,26 +79,30 @@ For complex objects, value can be JSON:
 
 ---
 
-## 3. `config_patch` — Deep-merge into openclaw.json
+## 3. `config_append` — Append values to a config array
 
-Applies a JSON deep-merge to `~/.openclaw/openclaw.json` using `jq`'s `*` operator. Use for bulk changes (20+ fields).
+Reads an existing config array, merges new values (deduped), and writes back via `openclaw config set`. Useful for adding to arrays like `skills.load.extraDirs` without overwriting existing entries.
 
 ```yaml
-- type: config_patch
-  merge_file: configs/update-models.json  # relative to files/
+- type: config_append
+  path: skills.load.extraDirs
+  value: '["~/.agents/skills"]'
 ```
 
 **Fields:**
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `merge_file` | yes | Path to JSON file relative to `files/`. |
+| `path` | yes | Dot-path config key (e.g. `skills.load.extraDirs`). |
+| `value` | yes | JSON array of values to append. |
 
 **Rules:**
-- Deep merge: nested objects merge recursively, scalars overwrite, arrays replace.
-- Requires `jq` on the instance.
-- Requires `openclaw.json` to exist (`openclaw onboard` creates it).
-- Never include secrets (API keys, tokens). Those stay in `.env`.
+- Reads existing array via `openclaw config get`, merges new values, deduplicates with `jq unique`.
+- Requires both `openclaw` and `jq` on the instance.
+- Idempotent — running multiple times produces the same result.
+- Environment variable references (`$VAR` or `${VAR}`) are expanded in both path and value.
+
+---
 
 ## 3b. `plugin_enable` — Enable a plugin
 

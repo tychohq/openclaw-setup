@@ -133,32 +133,6 @@ test_file_step_append_marker_idempotent() {
   teardown
 }
 
-test_config_patch_existing() {
-  setup
-  # Create an existing openclaw.json
-  mkdir -p "$TEST_HOME"
-  echo '{"existing": true, "models": {"other": "foo"}}' > "$TEST_HOME/openclaw.json"
-  load_patch test-config-patch.yaml
-  apply test-instance >/dev/null
-  # Check deep merge happened
-  jq -e '.existing == true' "$TEST_HOME/openclaw.json" >/dev/null
-  jq -e '.models.default == "anthropic/claude-sonnet-4-20250514"' "$TEST_HOME/openclaw.json" >/dev/null
-  jq -e '.models.other == "foo"' "$TEST_HOME/openclaw.json" >/dev/null
-  jq -e '.testKey == "testValue"' "$TEST_HOME/openclaw.json" >/dev/null
-  teardown
-}
-
-test_config_patch_missing_config() {
-  setup
-  # No openclaw.json exists — should fail with clear error
-  load_patch test-config-patch.yaml
-  local output
-  output="$(apply test-instance 2>&1)" || true
-  echo "$output" | grep -q "openclaw onboard"
-  [[ ! -f "$TEST_HOME/openclaw.json" ]]
-  teardown
-}
-
 test_config_set() {
   setup
   setup_mock_openclaw
@@ -338,15 +312,10 @@ test_restart_step() {
 
 test_full_patch() {
   setup
-  # Need an existing config for the config_patch step to merge into
-  mkdir -p "$TEST_HOME"
-  echo '{"existing": true}' > "$TEST_HOME/openclaw.json"
   load_patch test-full-patch.yaml
   apply test-instance >/dev/null
   # file step
   grep -q "from full patch" "$TEST_HOME/workspace/full-test.txt"
-  # config_patch step
-  jq -e '.testKey == "testValue"' "$TEST_HOME/openclaw.json" >/dev/null
   # exec step
   grep -q "full-patch-marker" "$TEST_HOME/full-marker.txt"
   teardown
@@ -516,8 +485,6 @@ run_test "file step (inline content)"     test_file_step_inline
 run_test "file step (append)"             test_file_step_append
 run_test "file step (append + marker)"    test_file_step_append_marker
 run_test "file step (marker idempotent)"  test_file_step_append_marker_idempotent
-run_test "config_patch (existing config)" test_config_patch_existing
-run_test "config_patch (missing config)"  test_config_patch_missing_config
 run_test "config_set"                     test_config_set
 run_test "config_append"                  test_config_append
 run_test "config_append (idempotent)"     test_config_append_idempotent

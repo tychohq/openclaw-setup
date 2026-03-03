@@ -25,10 +25,6 @@ function loadYaml(id: string): string {
   return readFileSync(resolve(projectRoot, `shared/patches/patches/${id}.yaml`), 'utf-8');
 }
 
-function loadConfigJson(filename: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(resolve(projectRoot, `shared/patches/files/${filename}`), 'utf-8'));
-}
-
 function loadCronJob(id: string): Record<string, unknown> {
   return JSON.parse(readFileSync(resolve(projectRoot, `shared/cron-jobs/${id}.json`), 'utf-8'));
 }
@@ -93,8 +89,6 @@ function setupEnv() {
         } else if (currentSteps && line.match(/^\s+- type: /)) {
           currentStep = { type: line.trim().slice(8) };
           currentSteps.push(currentStep);
-        } else if (currentStep && line.match(/^\s+merge_file: /)) {
-          currentStep.merge_file = line.trim().slice(12);
         } else if (currentStep && line.match(/^\s+plugin: /)) {
           currentStep.plugin = line.trim().slice(8);
         } else if (currentStep && line.match(/^\s+name: /)) {
@@ -156,17 +150,6 @@ function loadPatchesIntoState(ids: string[]) {
     const yamlText = loadYaml(id);
     const parsed = (globalThis as any).jsyaml.load(yamlText);
     state.patches.push(parsed);
-
-    // Load config files for config_patch steps
-    for (let i = 0; i < parsed.steps.length; i++) {
-      const step = parsed.steps[i];
-      if (step.merge_file) {
-        try {
-          const configData = loadConfigJson(step.merge_file);
-          state.configs[`${parsed.id}-${i}`] = configData;
-        } catch { /* some configs may not exist */ }
-      }
-    }
   }
 }
 
@@ -203,20 +186,11 @@ describe('E2E: full bundle with real data', () => {
     }
   });
 
-  test('no JSON files exist in files/configs/ (all migrated to config_set)', () => {
+  test('files/configs/ directory does not exist (fully removed)', () => {
     const configsDir = resolve(projectRoot, 'shared/patches/files/configs');
-    const jsonFiles = readdirSync(configsDir).filter(f => f.endsWith('.json'));
-    expect(jsonFiles).toHaveLength(0);
-  });
-
-  test('no production patches use config_patch steps', () => {
-    for (const id of patchCatalog) {
-      const yamlText = loadYaml(id);
-      const parsed = (globalThis as any).jsyaml.load(yamlText);
-      for (const step of parsed.steps) {
-        expect(step.type).not.toBe('config_patch');
-      }
-    }
+    let exists = true;
+    try { readdirSync(configsDir); } catch { exists = false; }
+    expect(exists).toBe(false);
   });
 });
 
@@ -240,7 +214,7 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     const config = JSON.parse(files['config-bundle.json']);
 
     // Manifest checks
-    expect(config.manifest.version).toBe('1.0.0');
+    expect(config.manifest.version).toBe('2.0.0');
     expect(config.manifest.source).toBe('local');
     expect(config.manifest.generated).toBeTruthy();
     expect(config.manifest.selectedPatches).toContain('agent-defaults');
@@ -256,8 +230,8 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     expect(patchIds).toContain('agent-defaults');
     expect(patchIds).toContain('discord-channel');
 
-    // No configs embedded (patches use config_set, not config_patch)
-    expect(Object.keys(config.configs)).toHaveLength(0);
+    // No configs map in v2.0.0 bundle format
+    expect(config.configs).toBeUndefined();
 
     // allowBundled: sorted array of selected bundled skills
     expect(config.allowBundled).toEqual(['discord', 'github', 'slack']);
@@ -289,8 +263,8 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     expect(config.patches).toHaveLength(patchCatalog.length);
     expect(config.manifest.selectedPatches).toHaveLength(patchCatalog.length);
 
-    // No config_patch steps remain — all patches use config_set/config_append
-    expect(Object.keys(config.configs)).toHaveLength(0);
+    // No configs map in v2.0.0 bundle format
+    expect(config.configs).toBeUndefined();
   });
 });
 
@@ -452,7 +426,7 @@ describe('E2E: full combined bundle (all 4 types selected)', () => {
       expect.arrayContaining(['tmux', 'weather']),
     );
     expect(config.patches).toHaveLength(2);
-    expect(Object.keys(config.configs)).toHaveLength(0);
+    expect(config.configs).toBeUndefined();
     expect(config.allowBundled).toEqual(['tmux', 'weather']);
 
     // ── cron-selections.json ──

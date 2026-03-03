@@ -184,7 +184,6 @@ exec_step() {
   
   case "$step_type" in
     file)            exec_step_file "$step_file" ;;
-    config_patch)    exec_step_config_patch "$step_file" ;;
     config_set)      exec_step_config_set "$step_file" ;;
     config_append)   exec_step_config_append "$step_file" ;;
     plugin_enable)   exec_step_plugin_enable "$step_file" ;;
@@ -254,39 +253,6 @@ exec_step_file() {
       die "file step unknown mode: $mode (expected overwrite or append)"
       ;;
   esac
-}
-
-exec_step_config_patch() {
-  local step_file="$1"
-  need_cmd jq
-
-  local config_file="$OPENCLAW_HOME/openclaw.json"
-
-  local merge_json_file
-  merge_json_file="$(yaml_get "$step_file" "merge_file")"
-
-  if [[ -n "$merge_json_file" ]]; then
-    local source="$FILES_DIR/$merge_json_file"
-    [[ -f "$source" ]] || die "merge_file not found: $source"
-
-    [[ -f "$config_file" ]] || die "openclaw.json not found at $config_file — run 'openclaw onboard' first"
-
-    local tmp
-    tmp=$(mktemp)
-    if ! jq -s '.[0] * .[1]' "$config_file" "$source" > "$tmp"; then
-      rm -f "$tmp"
-      die "jq merge failed for $merge_json_file — check that openclaw.json is valid JSON (not JSON5)"
-    fi
-    # Sanity check: ensure output is non-empty valid JSON
-    if ! jq empty "$tmp" 2>/dev/null; then
-      rm -f "$tmp"
-      die "jq produced invalid output when merging $merge_json_file"
-    fi
-    mv "$tmp" "$config_file"
-    info "Config patched from $merge_json_file"
-  else
-    die "config_patch step requires merge_file — use a JSON file in files/"
-  fi
 }
 
 exec_step_config_set() {
@@ -732,17 +698,6 @@ cmd_validate() {
           cf="$(yaml_get "$step" "content_file")"
           if [[ -n "$cf" && ! -f "$FILES_DIR/$cf" ]]; then
             warn "$id: content_file not found: files/$cf"
-            errors=$((errors + 1))
-          fi
-          ;;
-        config_patch)
-          local mf
-          mf="$(yaml_get "$step" "merge_file")"
-          if [[ -z "$mf" ]]; then
-            warn "$id: config_patch step missing required 'merge_file'"
-            errors=$((errors + 1))
-          elif [[ ! -f "$FILES_DIR/$mf" ]]; then
-            warn "$id: merge_file not found: files/$mf"
             errors=$((errors + 1))
           fi
           ;;

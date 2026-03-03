@@ -268,18 +268,17 @@ describe('buildBundleFiles', () => {
     expect(config.allowBundled).toBeUndefined();
   });
 
-  test('config-bundle.json includes patches and configs', () => {
+  test('config-bundle.json includes patches without configs map', () => {
     (globalThis as any).state.patches = [
-      { id: 'test-patch', description: 'test', steps: [{ type: 'config_patch', merge_file: 'test.json' }] },
+      { id: 'test-patch', description: 'test', steps: [{ type: 'config_set', path: 'key', value: 'value' }] },
     ];
     (globalThis as any).state.selected.add('test-patch');
-    (globalThis as any).state.configs['test-patch-0'] = { key: 'value' };
 
     const files = (globalThis as any).buildBundleFiles();
     const config = JSON.parse(files['config-bundle.json']);
     expect(config.patches).toHaveLength(1);
     expect(config.patches[0].id).toBe('test-patch');
-    expect(config.configs['test.json']).toEqual({ key: 'value' });
+    expect(config.configs).toBeUndefined();
   });
 
   test('cron-selections.json includes selected cron jobs', () => {

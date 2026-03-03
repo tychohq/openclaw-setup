@@ -36,19 +36,11 @@ requires:        # env vars that must be set before applying
   - ANTHROPIC_API_KEY
 
 steps:
-  - type: config_patch
-    merge_file: configs/update-models.json  # JSON file in files/
+  - type: config_set
+    path: models.default
+    value: "anthropic/claude-sonnet-4-20250514"
 
   - type: restart
-```
-
-Where `files/configs/update-models.json` contains:
-```json
-{
-  "models": {
-    "default": "anthropic/claude-sonnet-4-20250514"
-  }
-}
 ```
 
 ## Manifest Fields
@@ -67,8 +59,8 @@ Where `files/configs/update-models.json` contains:
 | Type | Description |
 |------|-------------|
 | `file` | Write a file to a path on the instance |
-| `config_patch` | Deep-merge into `openclaw.json` (requires `merge_file`) |
 | `config_set` | Set a single config field via CLI |
+| `config_append` | Append values to a config array (deduped) |
 | `plugin_enable` | Enable an OpenClaw plugin by id |
 | `mkdir` | Create directories |
 | `skill` | Copy a skill directory to `~/.openclaw/skills/` |
