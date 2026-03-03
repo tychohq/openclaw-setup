@@ -441,6 +441,22 @@ YAML
   teardown
 }
 
+test_no_merge_file_references() {
+  # Regression: merge_file was part of the deprecated config_patch step type.
+  # It should not appear in any code, YAML, or doc files (only meta/).
+  local repo_root
+  repo_root="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  local matches
+  matches="$(grep -r "merge_file" \
+    --include="*.sh" --include="*.yaml" --include="*.ts" --include="*.js" --include="*.md" \
+    "$repo_root" 2>/dev/null \
+    | grep -v "node_modules" \
+    | grep -v "/meta/" \
+    | grep -v "run-tests\.sh" \
+    || true)"
+  [[ -z "$matches" ]]
+}
+
 test_extension_step() {
   setup
   # Mock openclaw that handles "plugins install <path>" by copying the dir
@@ -507,6 +523,7 @@ run_test "requires blocks missing vars"   test_requires_blocks_missing_vars
 run_test "requires allows satisfied vars" test_requires_allows_satisfied_vars
 run_test "plugin_enable step"             test_plugin_enable_step
 run_test "extension step"                test_extension_step
+run_test "no merge_file references"      test_no_merge_file_references
 
 echo ""
 echo "Results: $PASS/$TOTAL passed, $FAIL failed"

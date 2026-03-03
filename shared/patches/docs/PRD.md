@@ -45,7 +45,6 @@ openclaw-patch publish                 → parse YAML
 openclaw-patches/
 ├── patches/              # YAML manifests (one per patch)
 ├── files/                # File contents referenced by patches
-│   ├── configs/          # JSON fragments for config_patch steps
 │   ├── workspace/        # Workspace files (AGENTS.md, etc.)
 │   └── cron/             # Cron job definitions (JSON)
 ├── skills/               # Skill directories copied to ~/.openclaw/skills/
@@ -100,31 +99,40 @@ Write content to any path on the instance. Supports inline content (short string
 - Exactly one of `content_file` or `content` is required.
 - `content_file` is relative to `files/` dir in the repo.
 - Parent directories are created automatically.
-- **Overwrites** existing files (no merge). For config merging, use `config_patch`.
+- **Overwrites** existing files (no merge). For config changes, use `config_set` or `config_append`.
 
-### 2. `config_patch` — Deep-merge into openclaw.json
+### 2. `config_set` — Set a single config field
 
-Applies a JSON deep-merge to `~/.openclaw/openclaw.json`. Uses `jq`'s `*` operator (`.[0] * .[1]`).
+Sets a single field in `~/.openclaw/openclaw.json` via `openclaw config set`.
 
 ```yaml
-- type: config_patch
-  merge_file: configs/update-models.json  # relative to files/
-```
-
-Where `files/configs/update-models.json`:
-```json
-{
-  "models": {
-    "default": "anthropic/claude-sonnet-4-20250514"
-  }
-}
+- type: config_set
+  path: models.default
+  value: "anthropic/claude-sonnet-4-20250514"
 ```
 
 **Rules:**
-- `merge_file` is relative to `files/` dir. Must be valid JSON.
-- Deep merge: nested objects are merged recursively, scalars are overwritten, **arrays are replaced** (not appended — this differs from OpenClaw's `config.patch` which appends).
-- Requires `jq` on the instance.
+- `path` is a dot-separated config key (e.g. `models.default`).
+- `value` can be a string or JSON object/array.
+- Requires `openclaw` CLI on the instance.
 - **Never include secrets** (API keys, tokens). Those stay in `.env`.
+
+### 2b. `config_append` — Append values to a config array
+
+Reads an existing config array, merges new values (deduped), and writes back via `openclaw config set`.
+
+```yaml
+- type: config_append
+  path: skills.load.extraDirs
+  value: '["~/.agents/skills"]'
+```
+
+**Rules:**
+- `path` is a dot-separated config key pointing to an array.
+- `value` must be a JSON array string.
+- Reads existing array, merges, deduplicates with `jq unique`.
+- Requires both `openclaw` and `jq` on the instance.
+- Idempotent — running multiple times produces the same result.
 
 ### 3. `skill` — Install a custom skill
 
@@ -233,7 +241,7 @@ Updates the OpenClaw npm package.
 ### YAML Parsing
 The CLI uses a hand-rolled mini YAML parser (grep/sed). This works for simple key-value pairs but has real limitations:
 - **Multi-line values** aren't supported (no `|` or `>` block scalars)
-- **Nested objects** under steps can't be read (hence `merge_file` and `job_file` indirection)
+- **Nested objects** under steps can't be read (hence `job_file` indirection for cron steps)
 - **Arrays** only work for the `targets` field and `clawhub.skills` (special-cased)
 
 **Decision:** Keep the mini parser for v1. All complex content goes in external files referenced by `*_file` keys. This is actually a cleaner design anyway — YAML manifests stay small and readable, content lives in proper files.
@@ -302,8 +310,8 @@ The current CLI has several issues that need fixing.
   ```
 - [ ] **Step parsing robustness**: the `parse_steps` function strips 4+ spaces of indentation but this breaks if someone uses 2-space indent. Normalize to handle 2, 4, or tab indentation.
 - [ ] **Empty targets handling**: `matches_target` uses `read -ra` which may produce an empty array. Ensure `[[ ${#targets[@]} -eq 0 ]]` returns true (match all) when targets field is omitted entirely.
-- [ ] **jq dependency check**: `exec_step_config_patch` calls `need_cmd jq` but other steps that need jq (like `is_applied`) don't. Add jq check at the start of `cmd_apply`.
-- [ ] **Sed portability**: `sed -i.bak` works on macOS but the fallback JSON append in `mark_applied` is fragile. Since we already require `jq` for config_patch, just always require jq and remove the sed fallback.
+- [ ] **jq dependency check**: `exec_step_config_append` calls `need_cmd jq` but other steps that need jq (like `is_applied`) don't. Add jq check at the start of `cmd_apply`.
+- [ ] **Sed portability**: `sed -i.bak` works on macOS but the fallback JSON append in `mark_applied` is fragile. Since we already require `jq` for `config_append`, just always require jq and remove the sed fallback.
 - [ ] **Exit on step failure**: `exec_step` functions don't always return proper exit codes. Wrap each in a subshell or check `$?` explicitly.
 
 **Verify:** Run `openclaw-patch validate` with no patches (should succeed). Run `openclaw-patch list` (should show empty list). Run `shellcheck scripts/openclaw-patch` — fix any errors.
@@ -314,7 +322,7 @@ Create a test harness that exercises each step type in isolation.
 - [ ] Create `tests/run-tests.sh` — a bash test runner
 - [ ] Create `tests/fixtures/` with test patch manifests and supporting files:
   - `test-file-step.yaml` + `tests/fixtures/files/test-content.txt`
-  - `test-config-patch.yaml` + `tests/fixtures/files/configs/test-merge.json`
+  - `test-config-set.yaml` + `test-config-append.yaml`
   - `test-skill-step.yaml` + `tests/fixtures/skills/test-skill/SKILL.md`
   - `test-clawhub-step.yaml` (mock — just verify parsing, don't actually install)
   - `test-cron-step.yaml` + `tests/fixtures/files/cron/test-job.json`
