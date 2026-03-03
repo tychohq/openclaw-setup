@@ -1,5 +1,5 @@
 id: memory-config
-description: "Memory backend, vector search, session memory hooks"
+description: "Builtin memory backend (.md indexing), session memory hooks, OpenAI embeddings"
 targets: ["*"]
 created: 2026-03-01T22:01:00Z
 

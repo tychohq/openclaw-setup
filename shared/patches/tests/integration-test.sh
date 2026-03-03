@@ -136,9 +136,14 @@ CHECKS=(
   '.session.reset.mode == "idle"'
   '.messages.queue.mode == "steer"'
 
-  # tools-config
+  # web-search
   '.tools.web.search.provider == "perplexity"'
+
+  # agent-permissions
   '.tools.exec.security == "full"'
+
+  # agent-collaboration
+  '.tools.sessions.visibility == "all"'
 
   # model-providers
   '.models.mode == "merge"'

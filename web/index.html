@@ -195,6 +195,7 @@ const state = {
   skills: [],          // loaded ClawHub skill objects
   skillsSelected: new Set(),
   bundledSelected: new Set(),
+  bundledDetails: {},  // name → {summary, displayName}
 };
 
 const BUNDLED_SKILLS = [
@@ -208,6 +209,12 @@ const BUNDLED_SKILLS = [
   'slack', 'songsee', 'sonoscli', 'spotify-player', 'summarize', 'things-mac',
   'tmux', 'trello', 'video-frames', 'voice-call', 'wacli', 'weather', 'xurl',
 ];
+
+const BUNDLED_DEFAULTS = new Set([
+  'clawhub', 'coding-agent', 'discord', 'gemini', 'gog', 'goplaces',
+  'mcporter', 'nano-banana-pro', 'nano-pdf', 'openai-image-gen',
+  'openai-whisper', 'openai-whisper-api', 'skill-creator', 'slack',
+]);
 
 // ── Mode detection ──
 const params = new URLSearchParams(window.location.search);
@@ -855,8 +862,24 @@ function deselectAllSkills() {
 }
 
 // ── Bundled Skills ──
+async function loadBundledDetails() {
+  const url = LOCAL
+    ? 'bundled-descriptions.json'
+    : `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/web/bundled-descriptions.json`;
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const descriptions = await res.json();
+  for (const [name, summary] of Object.entries(descriptions)) {
+    state.bundledDetails[name] = { summary, displayName: '' };
+  }
+}
+
 function renderBundledCard(name) {
   const isSelected = state.bundledSelected.has(name);
+  const details = state.bundledDetails[name];
+  const displayName = details?.displayName || humanize(name);
+  const summary = details?.summary || '';
+
   const card = document.createElement('div');
   card.className = 'bg-card rounded-lg border border-gray-800 hover:border-gray-700 transition-colors';
   card.id = `bundled-${name}`;
@@ -864,10 +887,16 @@ function renderBundledCard(name) {
   card.innerHTML = `
     <div class="p-4 select-none cursor-pointer" onclick="toggleBundledSelect('${name}')">
       <div class="flex items-center gap-3">
-        <input type="checkbox" class="accent-accent w-4 h-4 cursor-pointer rounded"
+        <input type="checkbox" class="accent-accent w-4 h-4 cursor-pointer rounded flex-shrink-0"
                ${isSelected ? 'checked' : ''}
                onclick="event.stopPropagation(); toggleBundledSelect('${name}')" />
-        <h3 class="font-medium text-white text-sm">${escapeHtml(name)}</h3>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <h3 class="font-medium text-white text-sm">${escapeHtml(displayName)}</h3>
+            <span class="text-[10px] text-gray-600 font-mono">${escapeHtml(name)}</span>
+          </div>
+          ${summary ? `<p class="text-gray-400 text-xs mt-0.5">${escapeHtml(summary)}</p>` : ''}
+        </div>
       </div>
     </div>
   `;
@@ -957,8 +986,18 @@ async function init() {
     console.error(err);
   }
 
-  // Render bundled skills (static list, no fetching needed)
+  // Render bundled skills — pre-select defaults, then fetch descriptions
+  for (const name of BUNDLED_DEFAULTS) {
+    if (BUNDLED_SKILLS.includes(name)) state.bundledSelected.add(name);
+  }
   renderAllBundled();
+  updateDownloadBar();
+
+  // Fetch descriptions and re-render with them
+  loadBundledDetails().then(() => {
+    renderAllBundled();
+    document.getElementById('bundled-count').textContent = `${BUNDLED_SKILLS.length} skills`;
+  }).catch(err => console.error('Bundled details load error:', err));
 
   // Load skills from ClawHub
   const skillsLoadingEl = document.getElementById('skills-loading');

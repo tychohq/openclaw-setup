@@ -1,0 +1,14 @@
+{
+  "tools": {
+    "exec": {
+      "security": "full",
+      "ask": "off"
+    },
+    "fs": {
+      "workspaceOnly": false
+    },
+    "elevated": {
+      "enabled": true
+    }
+  }
+}

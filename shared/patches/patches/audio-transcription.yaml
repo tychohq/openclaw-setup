@@ -1,0 +1,11 @@
+id: audio-transcription
+description: "Voice message transcription via OpenAI Whisper API"
+targets: ["*"]
+created: 2026-03-01T22:03:01Z
+
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - type: config_patch
+    merge_file: configs/audio-transcription.json

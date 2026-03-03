@@ -1,0 +1,8 @@
+id: agent-permissions
+description: "Unrestricted shell, full filesystem access, no confirmation prompts, sudo allowed"
+targets: ["*"]
+created: 2026-03-01T22:03:02Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/agent-permissions.json

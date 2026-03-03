@@ -1,7 +1,11 @@
 [
+  "agent-collaboration",
   "agent-defaults",
+  "agent-permissions",
+  "audio-transcription",
   "browser-config",
   "discord-channel",
+  "inject-datetime",
   "memory-config",
   "model-providers",
   "security-config",
@@ -10,5 +14,5 @@
   "skills-config",
   "slack-channel",
   "telegram-channel",
-  "tools-config"
+  "web-search"
 ]

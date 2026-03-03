@@ -24,17 +24,7 @@
     }
   },
   "memory": {
-    "backend": "builtin",
-    "qmd": {
-      "includeDefaultMemory": true,
-      "paths": [
-        {
-          "path": ".",
-          "name": "workspace",
-          "pattern": "**/*.md"
-        }
-      ]
-    }
+    "backend": "builtin"
   },
   "hooks": {
     "internal": {

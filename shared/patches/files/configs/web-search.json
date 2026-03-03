@@ -1,0 +1,9 @@
+{
+  "tools": {
+    "web": {
+      "search": {
+        "provider": "perplexity"
+      }
+    }
+  }
+}

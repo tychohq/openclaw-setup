@@ -1,5 +1,5 @@
 id: skills-config
-description: "Bundled skill allowlist, extra skill dirs, bun as node manager"
+description: "Extra skill dirs and npm as node manager (allowBundled comes from bundle selection)"
 targets: ["*"]
 created: 2026-03-01T22:09:00Z
 

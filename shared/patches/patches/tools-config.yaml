@@ -1,8 +1,0 @@
-id: tools-config
-description: "Tool permissions, exec security, search provider, agent-to-agent, audio transcription"
-targets: ["*"]
-created: 2026-03-01T22:03:00Z
-
-steps:
-  - type: config_patch
-    merge_file: configs/tools-config.json

@@ -1,0 +1,8 @@
+id: agent-collaboration
+description: "Multi-agent visibility — agents can see all sessions and message each other"
+targets: ["*"]
+created: 2026-03-01T22:03:03Z
+
+steps:
+  - type: config_patch
+    merge_file: configs/agent-collaboration.json

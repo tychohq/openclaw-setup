@@ -1,0 +1,11 @@
+id: web-search
+description: "Perplexity as web search provider (structured search results with snippets)"
+targets: ["*"]
+created: 2026-03-01T22:03:00Z
+
+requires:
+  - PERPLEXITY_API_KEY
+
+steps:
+  - type: config_patch
+    merge_file: configs/web-search.json

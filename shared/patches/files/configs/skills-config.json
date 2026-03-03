@@ -1,23 +1,12 @@
 {
   "skills": {
-    "allowBundled": [
-      "1password",
-      "clawhub",
-      "coding-agent",
-      "discord",
-      "github",
-      "mcporter",
-      "nano-banana-pro",
-      "openai-image-gen",
-      "skill-creator"
-    ],
     "load": {
       "extraDirs": [
         "~/.agents/skills"
       ]
     },
     "install": {
-      "nodeManager": "bun"
+      "nodeManager": "npm"
     }
   }
 }
