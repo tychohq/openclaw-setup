@@ -227,28 +227,19 @@ if [ -n "$CONFIG_BUNDLE_B64_VAL" ]; then
     BUNDLE_FILE=$(mktemp)
     echo "$CONFIG_BUNDLE_B64_VAL" | base64 -d | gunzip > "$BUNDLE_FILE"
 
-    # Extract patches from the bundle and apply their config content
-    # Each patch has .steps[].merge_file pointing to a key in .configs
-    PATCH_COUNT=$(jq '.patches | length' "$BUNDLE_FILE")
+    # Apply config patches: extract all config values from bundle and deep-merge into openclaw.json
+    # Uses a single jq call to avoid shell quoting issues
+    MERGED=$(jq -s '
+      .[0] as $bundle | .[1] as $base |
+      [$bundle.patches[]?.steps[]? | select(.type == "config_patch") | .merge_file] |
+      unique |
+      reduce .[] as $f ($base; . * ($bundle.configs[$f] // {}))
+    ' "$BUNDLE_FILE" "$OPENCLAW_JSON")
 
-    if [ "$PATCH_COUNT" -gt 0 ]; then
-        for i in $(seq 0 $((PATCH_COUNT - 1))); do
-            PATCH_ID=$(jq -r ".patches[$i].id" "$BUNDLE_FILE")
-            # Get merge_file references from steps
-            MERGE_FILES=$(jq -r ".patches[$i].steps[]?" "$BUNDLE_FILE" | jq -r 'select(.type == "config_patch") | .merge_file // empty')
-            for MERGE_FILE in $MERGE_FILES; do
-                CONFIG_CONTENT=$(jq --arg f "$MERGE_FILE" '.configs[$f] // empty' "$BUNDLE_FILE")
-                if [ -n "$CONFIG_CONTENT" ] && [ "$CONFIG_CONTENT" != "null" ]; then
-                    CURRENT=$(cat "$OPENCLAW_JSON")
-                    MERGED=$(echo -e "$CURRENT\n$CONFIG_CONTENT" | jq -s '.[0] * .[1]')
-                    echo "$MERGED" > "$OPENCLAW_JSON"
-                    log "  Applied patch: $PATCH_ID ($MERGE_FILE)"
-                else
-                    log "  WARNING: No config content found for $MERGE_FILE in patch $PATCH_ID"
-                fi
-            done
-        done
-        log "Applied $PATCH_COUNT config patches from bundle."
+    if [ -n "$MERGED" ] && [ "$MERGED" != "null" ]; then
+        echo "$MERGED" > "$OPENCLAW_JSON"
+        PATCH_NAMES=$(jq -r '[.patches[].id] | join(", ")' "$BUNDLE_FILE")
+        log "Applied config patches: $PATCH_NAMES"
     fi
 
     # Handle bundled skills allowlist
