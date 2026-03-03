@@ -106,6 +106,36 @@ Even then, prefer generating the config programmatically and applying via `openc
 - Full docs (LLM-friendly): https://docs.openclaw.ai/llms.txt
 - Config guide (in-repo): `shared/workspace/docs/config-guide.md`
 
+## Linear Integration
+All OpenClaw Platform work is tracked in Linear (workspace: Tycho, team: `TYC`).
+
+**CLI:**
+```bash
+L=~/.openclaw/workspace/bin/linear
+$L issues list --project "OpenClaw Platform"    # all platform tickets
+$L issues read TYC-30                           # full issue details + description
+$L issues update TYC-30 --status "In Progress"  # update status
+$L comments create TYC-30 --body "Update"       # add comment
+```
+
+**Workflow for each ticket:**
+1. `$L issues read TYC-XX` — read the issue and understand what's needed
+2. Create branch: `git checkout -b tyc-XX-short-description` (Linear auto-links PRs)
+3. Do the work, commit, push, open PR
+4. Linear auto-moves to "In Progress" on branch push, "Done" on merge
+
+**Project structure:**
+| Initiative | Project | What |
+|---|---|---|
+| OpenClaw Platform | OpenClaw Platform | Cross-cutting infra (config.patch, skill installs, cron, upgrades) |
+| OpenSesame | Don's / Aaron's OpenClaw | Client-specific setup |
+| Clay | Tess's / Yash's OpenClaw | Client-specific setup |
+| Side Projects | Clipper, Exfoliate, Right Hands, SkillDock, Agentic Software Factory | Side projects |
+
+**Labels:** `axel` (agent can do), `brenner` (needs Brenner), `blocker` (cross-cutting)
+
+**Full reference:** `~/.openclaw/workspace/tools/linear.md`
+
 ## Rules
 - Shell scripts: `set -e`, bash, no exotic deps
 - Never write secrets to tracked files — use `.env` (gitignored) or `openclaw secrets`
