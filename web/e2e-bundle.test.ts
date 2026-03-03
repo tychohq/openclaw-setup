@@ -202,6 +202,22 @@ describe('E2E: full bundle with real data', () => {
       expect(jsonFiles).toContain(id);
     }
   });
+
+  test('no JSON files exist in files/configs/ (all migrated to config_set)', () => {
+    const configsDir = resolve(projectRoot, 'shared/patches/files/configs');
+    const jsonFiles = readdirSync(configsDir).filter(f => f.endsWith('.json'));
+    expect(jsonFiles).toHaveLength(0);
+  });
+
+  test('no production patches use config_patch steps', () => {
+    for (const id of patchCatalog) {
+      const yamlText = loadYaml(id);
+      const parsed = (globalThis as any).jsyaml.load(yamlText);
+      for (const step of parsed.steps) {
+        expect(step.type).not.toBe('config_patch');
+      }
+    }
+  });
 });
 
 describe('E2E: select patches + bundled skills → config-bundle.json', () => {
@@ -240,12 +256,8 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     expect(patchIds).toContain('agent-defaults');
     expect(patchIds).toContain('discord-channel');
 
-    // Configs: embedded config JSON for config_patch steps
-    expect(config.configs['configs/agent-defaults.json']).toBeDefined();
-    expect(config.configs['configs/agent-defaults.json'].agents.defaults.model.primary).toBe(
-      'anthropic/claude-opus-4-6',
-    );
-    expect(config.configs['configs/discord-channel.json']).toBeDefined();
+    // No configs embedded (patches use config_set, not config_patch)
+    expect(Object.keys(config.configs)).toHaveLength(0);
 
     // allowBundled: sorted array of selected bundled skills
     expect(config.allowBundled).toEqual(['discord', 'github', 'slack']);
@@ -277,14 +289,8 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
     expect(config.patches).toHaveLength(patchCatalog.length);
     expect(config.manifest.selectedPatches).toHaveLength(patchCatalog.length);
 
-    // Every config_patch step should have its config embedded
-    for (const patch of config.patches) {
-      for (const step of patch.steps) {
-        if (step.type === 'config_patch' && step.merge_file) {
-          expect(config.configs[step.merge_file]).toBeDefined();
-        }
-      }
-    }
+    // No config_patch steps remain — all patches use config_set/config_append
+    expect(Object.keys(config.configs)).toHaveLength(0);
   });
 });
 
@@ -446,8 +452,7 @@ describe('E2E: full combined bundle (all 4 types selected)', () => {
       expect.arrayContaining(['tmux', 'weather']),
     );
     expect(config.patches).toHaveLength(2);
-    expect(config.configs['configs/agent-defaults.json']).toBeDefined();
-    expect(config.configs['configs/skills-config.json']).toBeDefined();
+    expect(Object.keys(config.configs)).toHaveLength(0);
     expect(config.allowBundled).toEqual(['tmux', 'weather']);
 
     // ── cron-selections.json ──
