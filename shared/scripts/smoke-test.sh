@@ -57,7 +57,7 @@ log "Gateway is healthy."
 # ── Step 2: Send agent message ───────────────────────────────────────────────
 
 log "Sending smoke test message..."
-start_ms=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
+start_ms=$(python3 -c 'import time; print(int(time.time()*1000))')
 
 RESULT=""
 if ! RESULT=$(openclaw agent \
@@ -75,7 +75,7 @@ if ! RESULT=$(openclaw agent \
   exit 1
 fi
 
-end_ms=$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')
+end_ms=$(python3 -c 'import time; print(int(time.time()*1000))')
 duration=$((end_ms - start_ms))
 
 # ── Step 3: Parse response ───────────────────────────────────────────────────
