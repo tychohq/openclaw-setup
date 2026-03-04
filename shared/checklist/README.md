@@ -93,6 +93,16 @@ gog auth login --keyring-backend file
 
 The `keyring` check (`CHECK_KEYRING=true`) detects when tools are using OS keyring and tells you exactly which ones.
 
+## Smoke Test (Model Verification)
+
+Before running the full health check, verify the model can respond:
+
+```bash
+bash ~/openclaw-setup/shared/scripts/smoke-test.sh
+```
+
+This sends a single message through the gateway and confirms the default model responds. It runs automatically as Step 11 of `post-clone-setup.sh` but can be re-run standalone anytime. Exits 0 on success, 1 on failure with diagnostic hints.
+
 ## Exit Codes
 
 | Code | Meaning |

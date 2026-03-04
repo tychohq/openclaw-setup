@@ -462,6 +462,26 @@ fi
 
 log "Gateway started."
 
+# ── 11. Smoke test ───────────────────────────────────────────────────────────
+
+log "Step 11: Running smoke test..."
+
+# Give gateway a moment to fully initialize
+sleep 5
+
+SMOKE_FAILED=false
+if bash "$REPO_DIR/shared/scripts/smoke-test.sh"; then
+  log "Smoke test passed!"
+else
+  log "⚠️  Smoke test failed — gateway started but model may not be configured correctly."
+  log "    Run 'bash ~/openclaw-setup/shared/scripts/smoke-test.sh' to retry."
+  SMOKE_FAILED=true
+fi
+
 # ── Done ─────────────────────────────────────────────────────────────────────
 
-log "post-clone-setup.sh complete!"
+if [ "$SMOKE_FAILED" = "true" ]; then
+  log "post-clone-setup.sh complete with warnings. ⚠️ Gateway is running but the model smoke test failed. Fix the issue and run: bash ~/openclaw-setup/shared/scripts/smoke-test.sh"
+else
+  log "post-clone-setup.sh complete! ✅ Your OpenClaw instance is ready."
+fi

@@ -34,6 +34,16 @@ cd aws && ./setup.sh
 ```
 See [aws/README.md](aws/README.md) for details.
 
+## Post-Deploy Verification
+
+After setup completes, verify the model can respond:
+
+```bash
+bash shared/scripts/smoke-test.sh
+```
+
+This runs automatically during AWS deployment (Step 11 of `post-clone-setup.sh`) but can be re-run standalone on any platform.
+
 ## Secrets
 
 Config templates live in `shared/config/`. Copy them to the repo root, fill in your values:
