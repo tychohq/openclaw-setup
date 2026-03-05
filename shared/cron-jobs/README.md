@@ -21,6 +21,7 @@ Each `.json` file contains a job definition ready to pass to `cron add`.
 | `daily-workspace-commit` | Daily 4 AM | Git commits workspace changes locally for backup/history |
 | `error-log-digest` | Daily 8 AM | Reviews gateway error logs, diagnoses issues, proposes fixes |
 | `cron-health-watchdog` | Every 6 hours | Monitors cron jobs themselves — alerts if any job has 3+ consecutive failures |
+| `daily-health-check` | Daily 5 AM | Runs checklist.sh, posts full results as a `.txt` attachment with a summary line |
 
 ## Customization
 
