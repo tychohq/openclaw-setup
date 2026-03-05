@@ -407,6 +407,32 @@ else
   log "No CRON_SELECTIONS_B64 in .env — skipping cron jobs."
 fi
 
+# ── 7b. Deploy checklist scripts ─────────────────────────────────────────────
+
+log "Step 7b: Checklist..."
+
+CHECKLIST_SRC="$REPO_DIR/shared/checklist"
+CHECKLIST_DEST="$OPENCLAW_DIR/checklist"
+CHECKLIST_CONF="$OPENCLAW_DIR/checklist.conf"
+
+if [ -d "$CHECKLIST_SRC" ]; then
+  if [ -d "$CHECKLIST_DEST" ]; then
+    log "  Checklist already deployed — updating."
+  fi
+  cp -r "$CHECKLIST_SRC" "$CHECKLIST_DEST"
+  log "  Checklist scripts deployed to $CHECKLIST_DEST"
+
+  # Create default config if none exists
+  if [ ! -f "$CHECKLIST_CONF" ]; then
+    cp "$CHECKLIST_DEST/checklist.conf.example" "$CHECKLIST_CONF"
+    log "  Created default checklist.conf"
+  else
+    log "  checklist.conf already exists — keeping."
+  fi
+else
+  log "  Checklist source not found at $CHECKLIST_SRC — skipping."
+fi
+
 # ── 8. Deploy first-boot skill + touch flag ──────────────────────────────────
 
 log "Step 8: First-boot skill..."
