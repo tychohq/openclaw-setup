@@ -9,7 +9,7 @@ requires:
 steps:
   - type: config_set
     path: agents.defaults.memorySearch
-    value: '{"sources":["memory","sessions"],"extraPaths":["."],"experimental":{"sessionMemory":true},"provider":"openai","remote":{"batch":{"enabled":false}},"fallback":"none","sync":{"sessions":{"deltaBytes":1,"deltaMessages":1}}}'
+    value: '{"sources":["memory","sessions"],"extraPaths":["."],"experimental":{"sessionMemory":true},"provider":"openai","remote":{"batch":{"enabled":true}},"fallback":"none","sync":{"sessions":{"deltaBytes":1,"deltaMessages":1}}}'
 
   - type: config_set
     path: memory.backend
