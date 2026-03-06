@@ -73,6 +73,14 @@ check_google() {
     local conf_account
     conf_account=$(conf_get "GOOGLE_ACCOUNT")
 
+    # On headless Linux, gog needs GOG_KEYRING_PASSWORD to decrypt tokens.
+    # Source it from OpenClaw's .env if not already set.
+    if [ -z "$GOG_KEYRING_PASSWORD" ] && [ -f "$HOME/.openclaw/.env" ]; then
+        local _gkp
+        _gkp=$(grep -E '^GOG_KEYRING_PASSWORD=' "$HOME/.openclaw/.env" 2>/dev/null | head -1 | cut -d= -f2-)
+        [ -n "$_gkp" ] && export GOG_KEYRING_PASSWORD="$_gkp"
+    fi
+
     # ── Try gog auth list --json ───────────────────────────────────────────────
     # Works when the Keychain is accessible (interactive terminal).
     # Falls back to keychain enumeration in headless/subprocess contexts.
