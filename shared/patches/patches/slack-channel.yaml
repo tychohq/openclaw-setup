@@ -29,5 +29,9 @@ steps:
     value: "allowlist"
 
   - type: config_set
+    path: channels.slack.replyToMode
+    value: "first"
+
+  - type: config_set
     path: channels.slack.streaming
     value: "off"
