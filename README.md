@@ -69,7 +69,7 @@ steps:
 
 **Available patches:** model providers, web search, browser config, memory, security, session settings, channel-specific configs (Discord, Telegram, Slack, Signal), agent defaults, and more.
 
-See [shared/patches/README.md](shared/patches/README.md) for the full patch reference and step types.
+See [shared/patches/README.md](shared/patches/README.md) for the full patch reference and step types, and jump straight to the [CLI Reference](shared/patches/README.md#cli-reference) for command docs and examples.
 
 ## Health Checks
 
