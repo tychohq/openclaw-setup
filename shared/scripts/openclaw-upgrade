@@ -222,7 +222,110 @@ ensure_runtime_dirs() {
 }
 
 setup_logging() {
-  exec >>"$LOG_PATH" 2>&1
+  if [[ "$DRY_RUN" == true ]]; then
+    LOG_PATH=""
+    return 0
+  fi
+
+  if [[ "${OPENCLAW_UPGRADE_NO_TEE:-}" == "1" ]]; then
+    exec >>"$LOG_PATH" 2>&1
+    return 0
+  fi
+
+  exec > >(tee -a "$LOG_PATH") 2>&1
+}
+
+mode_label() {
+  if [[ "$DRY_RUN" == true ]]; then
+    printf 'dry-run
+'
+  else
+    printf '%s
+' "$MODE"
+  fi
+}
+
+service_summary() {
+  local loaded runtime
+  loaded="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.loaded')"
+  runtime="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.runtime.status')"
+
+  if [[ -n "$runtime" ]]; then
+    printf '%s (loaded=%s, runtime=%s)
+' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}" "$runtime"
+  else
+    printf '%s (loaded=%s)
+' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}"
+  fi
+}
+
+describe_upgrade_path() {
+  local preview_mode update_install_kind switch_to_git switch_to_package install_kind
+  preview_mode="$(json_get "$UPDATE_PREVIEW_JSON" '.mode')"
+  update_install_kind="$(json_get "$UPDATE_PREVIEW_JSON" '.updateInstallKind')"
+  switch_to_git="$(json_get "$UPDATE_PREVIEW_JSON" '.switchToGit')"
+  switch_to_package="$(json_get "$UPDATE_PREVIEW_JSON" '.switchToPackage')"
+  install_kind="$(json_get "$UPDATE_PREVIEW_JSON" '.installKind')"
+
+  if [[ "$switch_to_git" == "true" ]]; then
+    printf 'package -> git checkout
+'
+  elif [[ "$switch_to_package" == "true" ]]; then
+    printf 'git checkout -> package install
+'
+  elif [[ -n "$preview_mode" ]]; then
+    printf '%s update via %s
+' "${update_install_kind:-${install_kind:-unknown}}" "$preview_mode"
+  elif [[ -n "$install_kind" ]]; then
+    printf '%s update
+' "$install_kind"
+  elif [[ -n "$INSTALL_KIND" ]]; then
+    printf '%s update
+' "$INSTALL_KIND"
+  else
+    printf 'unknown
+'
+  fi
+}
+
+print_dry_run_summary() {
+  local current_version target_version install_kind update_available requested_tag
+  current_version="${PREVIOUS_VERSION:-$(json_get "$UPDATE_PREVIEW_JSON" '.currentVersion')}"
+  target_version="$(json_get "$UPDATE_PREVIEW_JSON" '.targetVersion')"
+  install_kind="$(json_get "$UPDATE_PREVIEW_JSON" '.installKind')"
+  update_available="$(json_get "$UPDATE_STATUS_BEFORE_JSON" '.availability.available')"
+  requested_tag="${TAG:-$(json_get "$UPDATE_PREVIEW_JSON" '.tag')}"
+
+  log "Dry-run summary"
+  log "  Platform: $PLATFORM"
+  log "  Mode: $(mode_label)"
+  log "  Service: $(service_summary)"
+  log "  Install kind: ${install_kind:-${INSTALL_KIND:-unknown}}"
+  if [[ -n "$UPDATE_ROOT" ]]; then
+    log "  Install root: $UPDATE_ROOT"
+  fi
+  log "  Current version: ${current_version:-unknown}"
+  log "  Available version: ${target_version:-unknown}"
+  log "  Update available: ${update_available:-unknown}"
+  log "  Upgrade path: $(describe_upgrade_path)"
+  log "  Channel: $CHANNEL"
+  if [[ -n "$requested_tag" ]]; then
+    log "  Tag/spec: $requested_tag"
+  fi
+
+  if printf '%s' "$UPDATE_PREVIEW_JSON" | jq -e '.actions | type == "array" and length > 0' >/dev/null 2>&1; then
+    log "  Planned actions:"
+    while IFS= read -r action; do
+      log "    - $action"
+    done < <(printf '%s' "$UPDATE_PREVIEW_JSON" | jq -r '.actions[]')
+  fi
+
+  if printf '%s' "$UPDATE_PREVIEW_JSON" | jq -e '.notes | type == "array" and length > 0' >/dev/null 2>&1; then
+    log "  Notes:"
+    while IFS= read -r note; do
+      log "    - $note"
+    done < <(printf '%s' "$UPDATE_PREVIEW_JSON" | jq -r '.notes[]')
+  fi
 }
 
 cleanup() {
@@ -619,7 +722,7 @@ build_result_json() {
       final_version: (if ($final_version | length) > 0 then $final_version else null end),
       duration_seconds: $duration_seconds,
       exit_code: $exit_code,
-      log_path: $log_path,
+      log_path: (if ($log_path | length) > 0 then $log_path else null end),
       backup_path: (if ($backup_path | length) > 0 then $backup_path else null end),
       patch_status: $patch_status
     }'
@@ -694,12 +797,15 @@ main() {
   trap cleanup EXIT INT TERM
 
   log "Starting OpenClaw upgrade"
-  log "Mode=$MODE Channel=$CHANNEL Tag=${TAG:-<none>} DryRun=$DRY_RUN Platform=$PLATFORM Deployment=${DEPLOYMENT:-<none>}"
+  log "Mode=$(mode_label) Channel=$CHANNEL Tag=${TAG:-<none>} Platform=$PLATFORM Deployment=${DEPLOYMENT:-<none>}"
 
   acquire_lock || return $?
   preflight || return "$EXIT_FAILURE"
 
   if [[ "$MODE" == "notify-only" || "$DRY_RUN" == true ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+      print_dry_run_summary
+    fi
     FINAL_STATUS="success"
     FINAL_EXIT_CODE="$EXIT_SUCCESS"
     FINAL_VERSION="$(json_get "$UPDATE_PREVIEW_JSON" '.targetVersion')"

@@ -118,7 +118,7 @@ run_upgrade() {
   (
     cd "$workdir"
     "$UPGRADE_SCRIPT" "$@"
-  ) || rc=$?
+  ) >/dev/null 2>&1 || rc=$?
   printf '%s\n' "$rc"
 }
 
@@ -135,6 +135,7 @@ setup_scenario() {
   export OPENCLAW_TEST_SCENARIO="$scenario_dir"
   export OPENCLAW_HOME="$home_dir"
   export OPENCLAW_UPGRADE_PLATFORM="linux"
+  export OPENCLAW_UPGRADE_NO_TEE=1
   export PATH="$bin_dir:$ORIG_PATH"
   unset OPENCLAW_TEST_MUTATE_FILES OPENCLAW_TEST_REMOVE_HEALTH_FAIL_ON_SECOND_RESTART
 
@@ -148,17 +149,27 @@ setup_scenario() {
 }
 
 test_dry_run() {
-  local base scenario rc log_file
+  local base scenario rc output_file output
   base="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-upgrade-tests.XXXXXX")"
   setup_scenario dry-run "$base"
   scenario="$CURRENT_SCENARIO"
-  rc="$(run_upgrade "$ROOT_DIR" --dry-run)"
+  output_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade-output.XXXXXX")"
+  rc=0
+  (
+    cd "$ROOT_DIR"
+    "$UPGRADE_SCRIPT" --dry-run
+  ) >"$output_file" 2>&1 || rc=$?
+  output="$(cat "$output_file")"
+  rm -f "$output_file"
   assert_eq "$rc" "0" "dry-run should exit 0"
   assert_file_contains "$scenario/openclaw.calls" "update --json --no-restart --dry-run --timeout 1200 --channel stable" "dry-run should invoke update --dry-run"
   if compgen -G "$OPENCLAW_HOME/backups/upgrade-*" >/dev/null; then fail "dry-run should not create backup directories"; fi
   assert_not_exists "$scenario/systemctl.calls" "dry-run should not restart via systemctl"
-  log_file="$(ls "$OPENCLAW_HOME"/logs/upgrade-*.log | head -1)"
-  assert_exists "$log_file" "dry-run should create a log file"
+  if compgen -G "$OPENCLAW_HOME/logs/upgrade-*.log" >/dev/null; then fail "dry-run should not create log files"; fi
+  printf '%s' "$output" | grep -F 'Dry-run summary' >/dev/null || fail 'dry-run should print a summary'
+  printf '%s' "$output" | grep -F 'Mode: dry-run' >/dev/null || fail 'dry-run should show mode=dry-run'
+  printf '%s' "$output" | grep -F 'Current version: 1.0.0' >/dev/null || fail 'dry-run should show current version'
+  printf '%s' "$output" | grep -F 'Available version: 1.1.0' >/dev/null || fail 'dry-run should show available version'
   pass "dry-run"
   rm -rf "$base"
 }
