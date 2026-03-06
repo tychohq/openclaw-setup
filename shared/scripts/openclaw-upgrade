@@ -1,0 +1,1083 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PATCH_SCRIPT_DEFAULT="$REPO_ROOT/shared/patches/scripts/openclaw-patch"
+
+EXIT_SUCCESS=0
+EXIT_FAILURE=1
+EXIT_LOCK=2
+EXIT_ROLLBACK=3
+EXIT_HEALTH=4
+
+OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+CONFIG_FILE="$OPENCLAW_HOME/openclaw-upgrade.env"
+
+CHANNEL="stable"
+TAG=""
+TIMEOUT="1200"
+HEALTH_TIMEOUT="180"
+HEALTH_INTERVAL="5"
+MODE="apply"
+RETAIN_COUNT="10"
+RETAIN_DAYS="30"
+DISK_THRESHOLD_MB="200"
+WEBHOOK_URL=""
+NOTIFY=false
+NOTIFY_CHANNEL=""
+NOTIFY_TARGET=""
+DEPLOYMENT=""
+WITH_PATCHES=false
+DRY_RUN=false
+PLATFORM_OVERRIDE="${OPENCLAW_UPGRADE_PLATFORM:-}"
+
+TIMESTAMP=""
+START_EPOCH="0"
+LOG_DIR=""
+BACKUPS_DIR=""
+LOG_PATH=""
+BACKUP_DIR=""
+LOCK_FILE=""
+LOCK_ACQUIRED=false
+PLATFORM=""
+SERVICE_LABEL=""
+SERVICE_UNIT=""
+PATCH_STATUS="skipped"
+FINAL_STATUS="failure"
+FINAL_EXIT_CODE="$EXIT_FAILURE"
+FAILURE_REASON=""
+
+GATEWAY_STATUS_BEFORE_JSON=""
+UPDATE_STATUS_BEFORE_JSON=""
+UPDATE_PREVIEW_JSON=""
+UPDATE_RESULT_JSON=""
+HEALTH_JSON=""
+CRON_BEFORE_JSON=""
+CRON_STATUS_BEFORE_JSON=""
+SKILLS_BEFORE_JSON=""
+CRON_AFTER_JSON=""
+CRON_STATUS_AFTER_JSON=""
+SKILLS_AFTER_JSON=""
+
+INSTALL_KIND=""
+UPDATE_ROOT=""
+PREVIOUS_VERSION=""
+PREVIOUS_GIT_SHA=""
+FINAL_VERSION=""
+
+usage() {
+  cat <<'USAGE'
+Usage: openclaw-upgrade [options]
+
+Options:
+  --channel <stable|beta|dev>     Update channel (default: stable)
+  --tag <dist-tag|version>        Override dist-tag/version for this run
+  --timeout <seconds>             openclaw update timeout in seconds (default: 1200)
+  --health-timeout <seconds>      Wait for health this many seconds (default: 180)
+  --health-interval <seconds>     Sleep between health polls (default: 5)
+  --mode <apply|notify-only>      Run full upgrade or notify-only dry-run (default: apply)
+  --retain-count <n>              Keep this many backups (default: 10)
+  --retain-days <n>               Keep backups this many days (default: 30)
+  --disk-threshold-mb <n>         Minimum free disk in MB before upgrading (default: 200)
+  --deployment <name>             Deployment name for openclaw-patch sync
+  --webhook <url>                 POST run result JSON to this URL
+  --notify                        Send a summary via openclaw message send
+  --notify-channel <channel>      Notification channel for --notify
+  --notify-target <target>        Notification target for --notify
+  --with-patches                  Run openclaw-patch sync after a healthy upgrade
+  --dry-run                       Validate and preview without mutating state
+  --help                          Show this help text
+USAGE
+}
+
+log() {
+  printf '[openclaw-upgrade] %s\n' "$*"
+}
+
+warn() {
+  printf '[openclaw-upgrade] WARN: %s\n' "$*" >&2
+}
+
+fail() {
+  printf '[openclaw-upgrade] ERROR: %s\n' "$*" >&2
+}
+
+shell_join() {
+  local out=()
+  local arg
+  for arg in "$@"; do
+    out+=("$(printf '%q' "$arg")")
+  done
+  printf '%s ' "${out[@]}"
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    fail "Required command not found: $1"
+    return 1
+  }
+}
+
+json_get() {
+  local input="$1"
+  local filter="$2"
+  printf '%s' "$input" | jq -r "$filter // empty" 2>/dev/null || true
+}
+
+run_capture_stdout() {
+  local stdout_file stderr_file rc
+  stdout_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.stdout.XXXXXX")"
+  stderr_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.stderr.XXXXXX")"
+
+  if "$@" >"$stdout_file" 2>"$stderr_file"; then
+    if [[ -s "$stderr_file" ]]; then
+      cat "$stderr_file" >&2
+    fi
+    cat "$stdout_file"
+    rm -f "$stdout_file" "$stderr_file"
+    return 0
+  fi
+
+  rc=$?
+  if [[ -s "$stderr_file" ]]; then
+    cat "$stderr_file" >&2
+  fi
+  if [[ -s "$stdout_file" ]]; then
+    cat "$stdout_file"
+  fi
+  rm -f "$stdout_file" "$stderr_file"
+  return "$rc"
+}
+
+run_logged() {
+  log "Running: $(shell_join "$@")"
+  "$@"
+}
+
+load_config_file() {
+  if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
+  fi
+
+  CHANNEL="${OPENCLAW_UPGRADE_CHANNEL:-$CHANNEL}"
+  TAG="${OPENCLAW_UPGRADE_TAG:-$TAG}"
+  TIMEOUT="${OPENCLAW_UPGRADE_TIMEOUT:-$TIMEOUT}"
+  HEALTH_TIMEOUT="${OPENCLAW_UPGRADE_HEALTH_TIMEOUT:-$HEALTH_TIMEOUT}"
+  HEALTH_INTERVAL="${OPENCLAW_UPGRADE_HEALTH_INTERVAL:-$HEALTH_INTERVAL}"
+  MODE="${OPENCLAW_UPGRADE_MODE:-$MODE}"
+  RETAIN_COUNT="${OPENCLAW_UPGRADE_RETAIN_COUNT:-$RETAIN_COUNT}"
+  RETAIN_DAYS="${OPENCLAW_UPGRADE_RETAIN_DAYS:-$RETAIN_DAYS}"
+  DISK_THRESHOLD_MB="${OPENCLAW_UPGRADE_DISK_THRESHOLD_MB:-$DISK_THRESHOLD_MB}"
+  WEBHOOK_URL="${OPENCLAW_UPGRADE_WEBHOOK:-$WEBHOOK_URL}"
+  NOTIFY_CHANNEL="${OPENCLAW_UPGRADE_NOTIFY_CHANNEL:-$NOTIFY_CHANNEL}"
+  NOTIFY_TARGET="${OPENCLAW_UPGRADE_NOTIFY_TARGET:-$NOTIFY_TARGET}"
+  DEPLOYMENT="${OPENCLAW_UPGRADE_DEPLOYMENT:-$DEPLOYMENT}"
+  if [[ "${OPENCLAW_UPGRADE_WITH_PATCHES:-}" == "true" ]]; then
+    WITH_PATCHES=true
+  fi
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --channel)
+        shift
+        CHANNEL="${1:-}"
+        ;;
+      --tag)
+        shift
+        TAG="${1:-}"
+        ;;
+      --timeout)
+        shift
+        TIMEOUT="${1:-}"
+        ;;
+      --health-timeout)
+        shift
+        HEALTH_TIMEOUT="${1:-}"
+        ;;
+      --health-interval)
+        shift
+        HEALTH_INTERVAL="${1:-}"
+        ;;
+      --mode)
+        shift
+        MODE="${1:-}"
+        ;;
+      --retain-count)
+        shift
+        RETAIN_COUNT="${1:-}"
+        ;;
+      --retain-days)
+        shift
+        RETAIN_DAYS="${1:-}"
+        ;;
+      --disk-threshold-mb)
+        shift
+        DISK_THRESHOLD_MB="${1:-}"
+        ;;
+      --deployment)
+        shift
+        DEPLOYMENT="${1:-}"
+        ;;
+      --webhook)
+        shift
+        WEBHOOK_URL="${1:-}"
+        ;;
+      --notify)
+        NOTIFY=true
+        ;;
+      --notify-channel)
+        shift
+        NOTIFY_CHANNEL="${1:-}"
+        ;;
+      --notify-target)
+        shift
+        NOTIFY_TARGET="${1:-}"
+        ;;
+      --with-patches)
+        WITH_PATCHES=true
+        ;;
+      --dry-run)
+        DRY_RUN=true
+        ;;
+      --help|-h)
+        usage
+        return 1
+        ;;
+      *)
+        fail "Unknown argument: $1"
+        usage >&2
+        return 2
+        ;;
+    esac
+    shift || true
+  done
+}
+
+validate_args() {
+  case "$CHANNEL" in
+    stable|beta|dev) ;;
+    *) fail "--channel must be stable, beta, or dev"; return 1 ;;
+  esac
+
+  case "$MODE" in
+    apply|notify-only) ;;
+    *) fail "--mode must be apply or notify-only"; return 1 ;;
+  esac
+
+  case "$TIMEOUT" in
+    ''|*[!0-9]*) fail "--timeout must be an integer"; return 1 ;;
+  esac
+  case "$HEALTH_TIMEOUT" in
+    ''|*[!0-9]*) fail "--health-timeout must be an integer"; return 1 ;;
+  esac
+  case "$HEALTH_INTERVAL" in
+    ''|*[!0-9]*) fail "--health-interval must be an integer"; return 1 ;;
+  esac
+  case "$RETAIN_COUNT" in
+    ''|*[!0-9]*) fail "--retain-count must be an integer"; return 1 ;;
+  esac
+  case "$RETAIN_DAYS" in
+    ''|*[!0-9]*) fail "--retain-days must be an integer"; return 1 ;;
+  esac
+  case "$DISK_THRESHOLD_MB" in
+    ''|*[!0-9]*) fail "--disk-threshold-mb must be an integer"; return 1 ;;
+  esac
+
+  if $WITH_PATCHES && [[ -z "$DEPLOYMENT" ]]; then
+    fail "--with-patches requires --deployment or OPENCLAW_UPGRADE_DEPLOYMENT"
+    return 1
+  fi
+
+  return 0
+}
+
+resolve_platform() {
+  if [[ -n "$PLATFORM_OVERRIDE" ]]; then
+    PLATFORM="$PLATFORM_OVERRIDE"
+    return 0
+  fi
+
+  case "$(uname -s)" in
+    Darwin) PLATFORM="macos" ;;
+    Linux) PLATFORM="linux" ;;
+    *) fail "Unsupported platform: $(uname -s)"; return 1 ;;
+  esac
+}
+
+ensure_runtime_dirs() {
+  TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
+  LOG_DIR="$OPENCLAW_HOME/logs"
+  BACKUPS_DIR="$OPENCLAW_HOME/backups"
+  LOCK_FILE="$OPENCLAW_HOME/.upgrade-lock"
+  LOG_PATH="$LOG_DIR/upgrade-$TIMESTAMP.log"
+  BACKUP_DIR="$BACKUPS_DIR/upgrade-$TIMESTAMP"
+
+  mkdir -p "$OPENCLAW_HOME" "$LOG_DIR" "$BACKUPS_DIR"
+}
+
+setup_logging() {
+  exec > >(tee -a "$LOG_PATH") 2>&1
+}
+
+cleanup() {
+  if $LOCK_ACQUIRED && [[ -f "$LOCK_FILE" ]]; then
+    rm -f "$LOCK_FILE"
+  fi
+}
+
+acquire_lock() {
+  local payload existing_pid
+  payload="$(jq -n \
+    --arg pid "$$" \
+    --arg started_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    --arg hostname "$(hostname)" \
+    '{pid: ($pid|tonumber), started_at: $started_at, hostname: $hostname}')"
+
+  if ( set -o noclobber; printf '%s\n' "$payload" > "$LOCK_FILE" ) 2>/dev/null; then
+    LOCK_ACQUIRED=true
+    return 0
+  fi
+
+  existing_pid="$(jq -r '.pid // empty' "$LOCK_FILE" 2>/dev/null || true)"
+  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+    fail "Upgrade lock already held by PID $existing_pid"
+    return "$EXIT_LOCK"
+  fi
+
+  warn "Removing stale upgrade lock${existing_pid:+ for PID $existing_pid}"
+  rm -f "$LOCK_FILE"
+
+  if ( set -o noclobber; printf '%s\n' "$payload" > "$LOCK_FILE" ) 2>/dev/null; then
+    LOCK_ACQUIRED=true
+    return 0
+  fi
+
+  fail "Could not acquire upgrade lock"
+  return "$EXIT_LOCK"
+}
+
+check_disk_space() {
+  local available_kb required_kb
+  available_kb="$(df -Pk "$OPENCLAW_HOME" | awk 'NR==2 { print $4 }')"
+  required_kb=$((DISK_THRESHOLD_MB * 1024))
+  if [[ -z "$available_kb" || "$available_kb" -lt "$required_kb" ]]; then
+    fail "Insufficient free disk space: need ${DISK_THRESHOLD_MB}MB"
+    return 1
+  fi
+}
+
+warn_if_auto_update_enabled() {
+  local value
+  if value="$(run_capture_stdout openclaw config get update.auto.enabled --json 2>/dev/null)"; then
+    if [[ "$value" == "true" ]]; then
+      warn "update.auto.enabled=true may conflict with wrapper-based upgrades"
+    fi
+  fi
+}
+
+build_preview_args() {
+  PREVIEW_ARGS=(openclaw update --json --no-restart --dry-run --timeout "$TIMEOUT" --channel "$CHANNEL")
+  if [[ -n "$TAG" ]]; then
+    PREVIEW_ARGS+=(--tag "$TAG")
+  fi
+}
+
+build_apply_args() {
+  APPLY_ARGS=(openclaw update --yes --json --no-restart --timeout "$TIMEOUT" --channel "$CHANNEL")
+  if [[ -n "$TAG" ]]; then
+    APPLY_ARGS+=(--tag "$TAG")
+  fi
+}
+
+preflight() {
+  need_cmd openclaw
+  need_cmd jq
+  need_cmd git
+  need_cmd tar
+  need_cmd date
+  need_cmd df
+  need_cmd hostname
+  if [[ -n "$WEBHOOK_URL" ]]; then
+    need_cmd curl
+  fi
+  if [[ "$PLATFORM" == "linux" && "$DRY_RUN" == false ]]; then
+    need_cmd systemctl
+  fi
+  if [[ "$PLATFORM" == "macos" && "$DRY_RUN" == false ]]; then
+    need_cmd launchctl
+  fi
+
+  check_disk_space
+
+  GATEWAY_STATUS_BEFORE_JSON="$(run_capture_stdout openclaw gateway status --json)" || {
+    fail "openclaw gateway status --json failed"
+    return 1
+  }
+
+  if ! printf '%s' "$GATEWAY_STATUS_BEFORE_JSON" | jq -e '.service.loaded == true' >/dev/null 2>&1; then
+    fail "Gateway service is not installed/loaded"
+    return 1
+  fi
+
+  SERVICE_LABEL="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.label')"
+  if [[ "$PLATFORM" == "linux" ]]; then
+    if [[ -n "$SERVICE_LABEL" ]]; then
+      if [[ "$SERVICE_LABEL" == *.service ]]; then
+        SERVICE_UNIT="$SERVICE_LABEL"
+      else
+        SERVICE_UNIT="$SERVICE_LABEL.service"
+      fi
+    else
+      SERVICE_UNIT="openclaw-gateway.service"
+    fi
+  else
+    SERVICE_LABEL="${SERVICE_LABEL:-ai.openclaw.gateway}"
+  fi
+
+  UPDATE_STATUS_BEFORE_JSON="$(run_capture_stdout openclaw update status --json)" || {
+    fail "openclaw update status --json failed"
+    return 1
+  }
+
+  build_preview_args
+  UPDATE_PREVIEW_JSON="$(run_capture_stdout "${PREVIEW_ARGS[@]}")" || {
+    fail "openclaw update --dry-run --json failed"
+    return 1
+  }
+
+  INSTALL_KIND="$(json_get "$UPDATE_STATUS_BEFORE_JSON" '.update.installKind')"
+  UPDATE_ROOT="$(json_get "$UPDATE_STATUS_BEFORE_JSON" '.update.root')"
+  PREVIOUS_GIT_SHA="$(json_get "$UPDATE_STATUS_BEFORE_JSON" '.update.git.sha')"
+  PREVIOUS_VERSION="$(json_get "$UPDATE_PREVIEW_JSON" '.currentVersion')"
+
+  run_logged openclaw doctor --non-interactive --yes || {
+    fail "Preflight doctor failed"
+    return 1
+  }
+
+  if [[ "$MODE" == "apply" ]]; then
+    CRON_BEFORE_JSON="$(run_capture_stdout openclaw cron list --json)" || {
+      fail "openclaw cron list --json failed"
+      return 1
+    }
+    CRON_STATUS_BEFORE_JSON="$(run_capture_stdout openclaw cron status --json)" || {
+      fail "openclaw cron status --json failed"
+      return 1
+    }
+    SKILLS_BEFORE_JSON="$(run_capture_stdout openclaw skills list --json)" || {
+      fail "openclaw skills list --json failed"
+      return 1
+    }
+  fi
+
+  warn_if_auto_update_enabled
+}
+
+copy_if_present() {
+  local src="$1"
+  local dest="$2"
+  if [[ -f "$src" ]]; then
+    cp -f "$src" "$dest"
+  fi
+}
+
+resolve_workspace_manifest_path() {
+  local candidate
+  for candidate in \
+    "$OPENCLAW_HOME/workspace/config/workspace-manifest.json" \
+    "$OPENCLAW_HOME/workspace/workspace-manifest.json"
+  do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+write_metadata_file() {
+  local workspace_manifest_path previous_channel
+  workspace_manifest_path="$(resolve_workspace_manifest_path || true)"
+  previous_channel="$(json_get "$UPDATE_STATUS_BEFORE_JSON" '.channel.value')"
+
+  jq -n \
+    --arg timestamp "$TIMESTAMP" \
+    --arg hostname "$(hostname)" \
+    --arg platform "$PLATFORM" \
+    --arg channel "$CHANNEL" \
+    --arg tag "$TAG" \
+    --arg mode "$MODE" \
+    --arg install_kind "$INSTALL_KIND" \
+    --arg update_root "$UPDATE_ROOT" \
+    --arg previous_version "$PREVIOUS_VERSION" \
+    --arg previous_git_sha "$PREVIOUS_GIT_SHA" \
+    --arg previous_channel "$previous_channel" \
+    --arg service_label "$SERVICE_LABEL" \
+    --arg log_path "$LOG_PATH" \
+    --arg backup_path "$BACKUP_DIR" \
+    --arg deployment "$DEPLOYMENT" \
+    --arg workspace_manifest_path "$workspace_manifest_path" \
+    '{
+      timestamp: $timestamp,
+      hostname: $hostname,
+      platform: $platform,
+      requested: {
+        channel: $channel,
+        tag: $tag,
+        mode: $mode,
+        deployment: $deployment
+      },
+      install: {
+        kind: $install_kind,
+        root: $update_root,
+        previous_version: $previous_version,
+        previous_git_sha: $previous_git_sha,
+        previous_channel: $previous_channel
+      },
+      service: {
+        label: $service_label
+      },
+      paths: {
+        log: $log_path,
+        backup: $backup_path,
+        workspace_manifest: $workspace_manifest_path
+      }
+    }' > "$BACKUP_DIR/metadata.json"
+}
+
+create_backup() {
+  if [[ "$DRY_RUN" == true || "$MODE" == "notify-only" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$BACKUP_DIR"
+  copy_if_present "$OPENCLAW_HOME/openclaw.json" "$BACKUP_DIR/openclaw.json"
+  copy_if_present "$OPENCLAW_HOME/.env" "$BACKUP_DIR/.env"
+  copy_if_present "$OPENCLAW_HOME/agents/main/agent/auth-profiles.json" "$BACKUP_DIR/auth-profiles.json"
+
+  local workspace_manifest
+  workspace_manifest="$(resolve_workspace_manifest_path || true)"
+  if [[ -n "$workspace_manifest" ]]; then
+    cp -f "$workspace_manifest" "$BACKUP_DIR/workspace-manifest.json"
+  fi
+
+  printf '%s\n' "$GATEWAY_STATUS_BEFORE_JSON" > "$BACKUP_DIR/gateway-status-before.json"
+  printf '%s\n' "$UPDATE_STATUS_BEFORE_JSON" > "$BACKUP_DIR/update-status-before.json"
+  printf '%s\n' "$CRON_BEFORE_JSON" > "$BACKUP_DIR/cron-before.json"
+  printf '%s\n' "$CRON_STATUS_BEFORE_JSON" > "$BACKUP_DIR/cron-status-before.json"
+  printf '%s\n' "$SKILLS_BEFORE_JSON" > "$BACKUP_DIR/skills-before.json"
+  write_metadata_file
+}
+
+run_update() {
+  if [[ "$DRY_RUN" == true || "$MODE" == "notify-only" ]]; then
+    UPDATE_RESULT_JSON="$UPDATE_PREVIEW_JSON"
+    return 0
+  fi
+
+  build_apply_args
+  UPDATE_RESULT_JSON="$(run_capture_stdout "${APPLY_ARGS[@]}")" || return 1
+
+  if ! printf '%s' "$UPDATE_RESULT_JSON" | jq -e '.status == "ok"' >/dev/null 2>&1; then
+    fail "Update JSON did not report status=ok"
+    return 1
+  fi
+
+  FINAL_VERSION="$(json_get "$UPDATE_RESULT_JSON" '.after.version')"
+  if [[ -z "$PREVIOUS_VERSION" ]]; then
+    PREVIOUS_VERSION="$(json_get "$UPDATE_RESULT_JSON" '.before.version')"
+  fi
+
+  return 0
+}
+
+restore_file_from_backup() {
+  local backup_name="$1"
+  local target_path="$2"
+  if [[ -f "$BACKUP_DIR/$backup_name" ]]; then
+    mkdir -p "$(dirname "$target_path")"
+    cp -f "$BACKUP_DIR/$backup_name" "$target_path"
+  fi
+}
+
+restore_snapshot_files() {
+  if [[ ! -d "$BACKUP_DIR" ]]; then
+    warn "No backup directory available for restore"
+    return 1
+  fi
+
+  restore_file_from_backup "openclaw.json" "$OPENCLAW_HOME/openclaw.json"
+  restore_file_from_backup ".env" "$OPENCLAW_HOME/.env"
+  restore_file_from_backup "auth-profiles.json" "$OPENCLAW_HOME/agents/main/agent/auth-profiles.json"
+
+  local workspace_manifest_target
+  workspace_manifest_target="$OPENCLAW_HOME/workspace/config/workspace-manifest.json"
+  if [[ -f "$BACKUP_DIR/workspace-manifest.json" ]]; then
+    mkdir -p "$(dirname "$workspace_manifest_target")"
+    cp -f "$BACKUP_DIR/workspace-manifest.json" "$workspace_manifest_target"
+  fi
+}
+
+detect_source_package_manager() {
+  local root="$1"
+  if [[ -f "$root/bun.lock" || -f "$root/bun.lockb" ]]; then
+    printf 'bun\n'
+    return 0
+  fi
+  if [[ -f "$root/pnpm-lock.yaml" ]]; then
+    printf 'pnpm\n'
+    return 0
+  fi
+  if [[ -f "$root/package-lock.json" ]]; then
+    printf 'npm\n'
+    return 0
+  fi
+  if [[ -f "$root/yarn.lock" ]]; then
+    printf 'yarn\n'
+    return 0
+  fi
+  return 1
+}
+
+run_source_refresh() {
+  local root="$1"
+  local manager build_exists
+
+  manager="$(detect_source_package_manager "$root" || true)"
+  if [[ -z "$manager" ]]; then
+    warn "Could not detect package manager for source rollback refresh"
+    return 0
+  fi
+
+  case "$manager" in
+    bun)
+      (cd "$root" && run_logged bun install --frozen-lockfile)
+      ;;
+    pnpm)
+      (cd "$root" && run_logged pnpm install --frozen-lockfile)
+      ;;
+    npm)
+      (cd "$root" && run_logged npm install)
+      ;;
+    yarn)
+      (cd "$root" && run_logged yarn install --frozen-lockfile)
+      ;;
+  esac
+
+  build_exists=false
+  if [[ -f "$root/package.json" ]] && jq -e '.scripts.build != null' "$root/package.json" >/dev/null 2>&1; then
+    build_exists=true
+  fi
+
+  if [[ "$build_exists" == true ]]; then
+    case "$manager" in
+      bun)
+        (cd "$root" && run_logged bun run build)
+        ;;
+      pnpm)
+        (cd "$root" && run_logged pnpm build)
+        ;;
+      npm)
+        (cd "$root" && run_logged npm run build)
+        ;;
+      yarn)
+        (cd "$root" && run_logged yarn build)
+        ;;
+    esac
+  fi
+
+  run_logged openclaw gateway install --force || warn "openclaw gateway install --force failed during source refresh"
+}
+
+perform_version_rollback() {
+  if [[ "$INSTALL_KIND" == "package" && -n "$PREVIOUS_VERSION" ]]; then
+    local rollback_output
+    rollback_output="$(run_capture_stdout openclaw update --yes --json --no-restart --tag "$PREVIOUS_VERSION")" || return 1
+    printf '%s\n' "$rollback_output" > "$BACKUP_DIR/rollback-update.json"
+    return 0
+  fi
+
+  if [[ -n "$UPDATE_ROOT" && -n "$PREVIOUS_GIT_SHA" && -d "$UPDATE_ROOT/.git" ]]; then
+    run_logged git -C "$UPDATE_ROOT" checkout "$PREVIOUS_GIT_SHA" || return 1
+    run_source_refresh "$UPDATE_ROOT" || return 1
+    return 0
+  fi
+
+  warn "Insufficient metadata to perform version rollback"
+  return 1
+}
+
+restart_gateway() {
+  if [[ "$DRY_RUN" == true || "$MODE" == "notify-only" ]]; then
+    log "Dry run / notify-only: skipping service restart"
+    return 0
+  fi
+
+  if [[ "$PLATFORM" == "macos" ]]; then
+    run_logged launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL"
+  else
+    run_logged systemctl --user restart "$SERVICE_UNIT"
+  fi
+}
+
+wait_for_health() {
+  local deadline now
+  deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
+
+  while true; do
+    if HEALTH_JSON="$(run_capture_stdout openclaw health --json --timeout 10000)"; then
+      FINAL_VERSION="${FINAL_VERSION:-$(json_get "$HEALTH_JSON" '.version')}"
+      return 0
+    fi
+
+    now="$(date +%s)"
+    if [[ "$now" -ge "$deadline" ]]; then
+      fail "Gateway health check timed out after ${HEALTH_TIMEOUT}s"
+      return 1
+    fi
+    sleep "$HEALTH_INTERVAL"
+  done
+}
+
+capture_post_update_state() {
+  CRON_AFTER_JSON="$(run_capture_stdout openclaw cron list --json)" || return 1
+  CRON_STATUS_AFTER_JSON="$(run_capture_stdout openclaw cron status --json)" || return 1
+  SKILLS_AFTER_JSON="$(run_capture_stdout openclaw skills list --json)" || return 1
+  return 0
+}
+
+extract_cron_keys() {
+  local json_input="$1"
+  printf '%s' "$json_input" | jq -r '
+    def items:
+      if type == "array" then .[]
+      elif type == "object" then (.jobs // .items // .entries // .cron // .data // [])[]?
+      else empty end;
+    items
+    | [(.id // ""), (.name // "")]
+    | @tsv
+  ' 2>/dev/null | sed '/^\t$/d' | LC_ALL=C sort -u
+}
+
+extract_skill_keys() {
+  local json_input="$1"
+  printf '%s' "$json_input" | jq -r '
+    def items:
+      if type == "array" then .[]
+      elif type == "object" then (.skills // .items // .entries // .available // .data // [])[]?
+      else empty end;
+    items
+    | (.name // .id // .slug // empty)
+  ' 2>/dev/null | sed '/^$/d' | LC_ALL=C sort -u
+}
+
+compare_sets() {
+  local before="$1"
+  local after="$2"
+  local missing_file before_file after_file
+  before_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.before.XXXXXX")"
+  after_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.after.XXXXXX")"
+  missing_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.missing.XXXXXX")"
+  printf '%s\n' "$before" > "$before_file"
+  printf '%s\n' "$after" > "$after_file"
+  comm -23 "$before_file" "$after_file" > "$missing_file" || true
+  cat "$missing_file"
+  rm -f "$before_file" "$after_file" "$missing_file"
+}
+
+verify_integrity() {
+  local before_cron after_cron before_skills after_skills missing
+
+  before_cron="$(extract_cron_keys "$CRON_BEFORE_JSON")"
+  after_cron="$(extract_cron_keys "$CRON_AFTER_JSON")"
+  missing="$(compare_sets "$before_cron" "$after_cron")"
+  if [[ -n "$missing" ]]; then
+    fail "Cron integrity check failed; missing entries: $(echo "$missing" | tr '\n' ' ' | sed 's/[[:space:]]\+$//')"
+    return 1
+  fi
+
+  before_skills="$(extract_skill_keys "$SKILLS_BEFORE_JSON")"
+  after_skills="$(extract_skill_keys "$SKILLS_AFTER_JSON")"
+  missing="$(compare_sets "$before_skills" "$after_skills")"
+  if [[ -n "$missing" ]]; then
+    fail "Skills integrity check failed; missing entries: $(echo "$missing" | tr '\n' ' ' | sed 's/[[:space:]]\+$//')"
+    return 1
+  fi
+
+  return 0
+}
+
+resolve_patch_command() {
+  if [[ -x "$PATCH_SCRIPT_DEFAULT" ]]; then
+    printf '%s\n' "$PATCH_SCRIPT_DEFAULT"
+    return 0
+  fi
+  if command -v openclaw-patch >/dev/null 2>&1; then
+    command -v openclaw-patch
+    return 0
+  fi
+  return 1
+}
+
+run_patch_sync() {
+  local patch_cmd
+  patch_cmd="$(resolve_patch_command || true)"
+  if [[ -z "$patch_cmd" ]]; then
+    warn "Patch sync requested but openclaw-patch is unavailable"
+    PATCH_STATUS="missing"
+    return 1
+  fi
+
+  if [[ -z "$DEPLOYMENT" ]]; then
+    warn "Patch sync requested but no deployment name is configured"
+    PATCH_STATUS="missing-deployment"
+    return 1
+  fi
+
+  if run_logged "$patch_cmd" sync --deployment "$DEPLOYMENT"; then
+    PATCH_STATUS="success"
+    return 0
+  fi
+
+  PATCH_STATUS="failed"
+  return 1
+}
+
+prune_backups() {
+  local backups=() index
+  if [[ "$DRY_RUN" == true || "$MODE" == "notify-only" ]]; then
+    return 0
+  fi
+
+  if [[ -d "$BACKUPS_DIR" ]]; then
+    while IFS= read -r line; do
+      backups+=("$line")
+    done < <(ls -1dt "$BACKUPS_DIR"/upgrade-* 2>/dev/null || true)
+
+    for (( index=RETAIN_COUNT; index<${#backups[@]}; index+=1 )); do
+      rm -rf "${backups[$index]}"
+    done
+
+    find "$BACKUPS_DIR" -mindepth 1 -maxdepth 1 -type d -name 'upgrade-*' -mtime "+$RETAIN_DAYS" -exec rm -rf {} + 2>/dev/null || true
+  fi
+}
+
+build_result_json() {
+  local duration_seconds
+  duration_seconds=$(( $(date +%s) - START_EPOCH ))
+
+  jq -n \
+    --arg status "$FINAL_STATUS" \
+    --arg reason "$FAILURE_REASON" \
+    --arg host "$(hostname)" \
+    --arg platform "$PLATFORM" \
+    --arg channel "$CHANNEL" \
+    --arg tag "$TAG" \
+    --arg deployment "$DEPLOYMENT" \
+    --arg previous_version "$PREVIOUS_VERSION" \
+    --arg final_version "$FINAL_VERSION" \
+    --arg log_path "$LOG_PATH" \
+    --arg backup_path "$BACKUP_DIR" \
+    --arg patch_status "$PATCH_STATUS" \
+    --argjson exit_code "$FINAL_EXIT_CODE" \
+    --argjson duration_seconds "$duration_seconds" \
+    '{
+      status: $status,
+      reason: ($reason | select(length > 0)),
+      host: $host,
+      platform: $platform,
+      channel: $channel,
+      tag: ($tag | select(length > 0)),
+      deployment: ($deployment | select(length > 0)),
+      previous_version: ($previous_version | select(length > 0)),
+      final_version: ($final_version | select(length > 0)),
+      duration_seconds: $duration_seconds,
+      exit_code: $exit_code,
+      log_path: $log_path,
+      backup_path: ($backup_path | select(length > 0)),
+      patch_status: $patch_status
+    }'
+}
+
+send_webhook() {
+  local payload="$1"
+  if [[ -z "$WEBHOOK_URL" ]]; then
+    return 0
+  fi
+
+  if ! curl -fsS -X POST -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK_URL" >/dev/null; then
+    warn "Webhook notification failed"
+    return 1
+  fi
+  return 0
+}
+
+send_notify_message() {
+  local payload="$1"
+  local status_text message
+  if [[ "$NOTIFY" != true ]]; then
+    return 0
+  fi
+
+  if [[ -z "$NOTIFY_CHANNEL" || -z "$NOTIFY_TARGET" ]]; then
+    warn "--notify was set but notify channel/target is missing"
+    return 1
+  fi
+
+  status_text="$(printf '%s' "$payload" | jq -r '.status')"
+  message="OpenClaw upgrade ${status_text} on $(hostname)"
+  if [[ -n "$PREVIOUS_VERSION" || -n "$FINAL_VERSION" ]]; then
+    message+=" (${PREVIOUS_VERSION:-unknown} -> ${FINAL_VERSION:-unknown})"
+  fi
+  if [[ -n "$DEPLOYMENT" ]]; then
+    message+=" [${DEPLOYMENT}]"
+  fi
+
+  run_logged openclaw message send --channel "$NOTIFY_CHANNEL" --target "$NOTIFY_TARGET" --message "$message" >/dev/null || {
+    warn "openclaw message send notification failed"
+    return 1
+  }
+  return 0
+}
+
+finalize_result() {
+  local result_json
+  result_json="$(build_result_json)"
+  if [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]]; then
+    printf '%s\n' "$result_json" > "$BACKUP_DIR/result.json"
+  fi
+  send_webhook "$result_json" || true
+  send_notify_message "$result_json" || true
+  log "Final status: $FINAL_STATUS (exit $FINAL_EXIT_CODE)"
+}
+
+attempt_rollback() {
+  log "Starting rollback flow"
+  restore_snapshot_files || true
+  if ! perform_version_rollback; then
+    FINAL_STATUS="rollback_failure"
+    return 1
+  fi
+  if ! restart_gateway; then
+    FINAL_STATUS="rollback_failure"
+    return 1
+  fi
+  if ! wait_for_health; then
+    FINAL_STATUS="rollback_failure"
+    return 1
+  fi
+  if ! run_logged openclaw doctor --non-interactive --yes; then
+    FINAL_STATUS="rollback_failure"
+    return 1
+  fi
+  FINAL_STATUS="rollback_success"
+  return 0
+}
+
+fail_and_exit() {
+  local reason="$1"
+  local exit_code="$2"
+  FAILURE_REASON="$reason"
+  FINAL_EXIT_CODE="$exit_code"
+  FINAL_STATUS="failure"
+
+  fail "$reason"
+
+  if [[ "$DRY_RUN" == false && "$MODE" == "apply" && -d "$BACKUP_DIR" ]]; then
+    if attempt_rollback; then
+      FINAL_EXIT_CODE="$EXIT_ROLLBACK"
+    fi
+  fi
+
+  finalize_result
+  return "$FINAL_EXIT_CODE"
+}
+
+main() {
+  START_EPOCH="$(date +%s)"
+  load_config_file
+  if ! parse_args "$@"; then
+    local parse_rc=$?
+    if [[ "$parse_rc" -eq 1 ]]; then
+      return 0
+    fi
+    return "$EXIT_FAILURE"
+  fi
+  validate_args || return "$EXIT_FAILURE"
+  resolve_platform || return "$EXIT_FAILURE"
+  ensure_runtime_dirs
+  setup_logging
+  trap cleanup EXIT INT TERM
+
+  log "Starting OpenClaw upgrade"
+  log "Mode=$MODE Channel=$CHANNEL Tag=${TAG:-<none>} DryRun=$DRY_RUN Platform=$PLATFORM Deployment=${DEPLOYMENT:-<none>}"
+
+  acquire_lock || return $?
+  preflight || return "$EXIT_FAILURE"
+
+  if [[ "$MODE" == "notify-only" || "$DRY_RUN" == true ]]; then
+    FINAL_STATUS="success"
+    FINAL_EXIT_CODE="$EXIT_SUCCESS"
+    FINAL_VERSION="$(json_get "$UPDATE_PREVIEW_JSON" '.targetVersion')"
+    finalize_result
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  create_backup || return "$EXIT_FAILURE"
+
+  if ! run_update; then
+    fail_and_exit "openclaw update failed" "$EXIT_FAILURE"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  if ! run_logged openclaw doctor --non-interactive --yes; then
+    fail_and_exit "Post-update doctor failed" "$EXIT_FAILURE"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  if ! restart_gateway; then
+    fail_and_exit "Gateway restart failed" "$EXIT_FAILURE"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  if ! wait_for_health; then
+    fail_and_exit "Gateway health check failed" "$EXIT_HEALTH"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  if ! capture_post_update_state; then
+    fail_and_exit "Post-upgrade cron/skills snapshot failed" "$EXIT_FAILURE"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  if ! verify_integrity; then
+    fail_and_exit "Cron/skills integrity verification failed" "$EXIT_FAILURE"
+    return "$FINAL_EXIT_CODE"
+  fi
+
+  FINAL_STATUS="success"
+  FINAL_EXIT_CODE="$EXIT_SUCCESS"
+
+  if $WITH_PATCHES; then
+    if ! run_patch_sync; then
+      FINAL_STATUS="degraded"
+      FINAL_EXIT_CODE="$EXIT_FAILURE"
+      FAILURE_REASON="openclaw-patch sync failed"
+    fi
+  else
+    PATCH_STATUS="not-requested"
+  fi
+
+  prune_backups || true
+  finalize_result
+  return "$FINAL_EXIT_CODE"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+  exit $?
+fi
