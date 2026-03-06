@@ -92,10 +92,11 @@ setup_test_env() {
   TEST_HOME="$TEST_ROOT/openclaw-home"
   TEST_PATCH_ROOT="$TEST_ROOT/patches-repo"
   TEST_ENV_FILE="$TEST_ROOT/.env"
+  TEST_GATEWAY_CWD="$TEST_ROOT/gateway-cwd"
   TEST_GATEWAY_LOG="$TEST_ROOT/gateway.log"
   GATEWAY_PID=""
 
-  mkdir -p "$TEST_HOME" "$TEST_PATCH_ROOT/patches" "$TEST_PATCH_ROOT/files" "$TEST_PATCH_ROOT/skills" "$TEST_PATCH_ROOT/extensions"
+  mkdir -p "$TEST_HOME" "$TEST_PATCH_ROOT/patches" "$TEST_PATCH_ROOT/files" "$TEST_PATCH_ROOT/skills" "$TEST_PATCH_ROOT/extensions" "$TEST_GATEWAY_CWD"
   printf '{}\n' > "$TEST_HOME/openclaw.json"
 
   export OPENCLAW_HOME="$TEST_HOME"
@@ -150,13 +151,15 @@ cleanup_test_env() {
 }
 
 start_test_gateway() {
-  cd "$TEST_ROOT"
-  "$OPENCLAW_BIN" gateway run \
-    --port "$TEST_GATEWAY_PORT" \
-    --bind loopback \
-    --auth none \
-    --allow-unconfigured \
-    >"$TEST_GATEWAY_LOG" 2>&1 &
+  (
+    cd "$TEST_GATEWAY_CWD"
+    "$OPENCLAW_BIN" gateway run \
+      --port "$TEST_GATEWAY_PORT" \
+      --bind loopback \
+      --auth none \
+      --allow-unconfigured \
+      >"$TEST_GATEWAY_LOG" 2>&1
+  ) &
   GATEWAY_PID=$!
   disown "$GATEWAY_PID" 2>/dev/null || true
 

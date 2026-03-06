@@ -1,5 +1,10 @@
 {
   "id": "test-extension",
   "name": "Test Extension",
-  "description": "Test extension for patch system tests"
+  "description": "Test extension for patch system tests",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
 }
