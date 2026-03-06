@@ -61,7 +61,7 @@ At minimum, you need **one AI provider key** and **one channel token**:
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
-GEMINI_API_KEY=AI...
+GEMINI_API_KEY=AI...            # Gemini uses env-var auth directly; no auth profile entry needed
 
 # Pick at least one chat channel:
 DISCORD_TOKEN=MTIz...          # Discord Developer Portal → Bot → Token
@@ -72,6 +72,8 @@ SLACK_APP_TOKEN=xapp-...        # Slack Socket Mode token
 # Optional:
 BRAVE_SEARCH_API_KEY=BSA...     # Web search (brave.com/search/api)
 ```
+
+`openclaw-auth-profiles.json` covers Anthropic, OpenAI, and OpenRouter. Gemini is configured from `openclaw-secrets.env` via `GEMINI_API_KEY`.
 
 ### Required Config (`openclaw-secrets.json`)
 
@@ -124,10 +126,17 @@ This file maps provider names to actual API keys. Fill in the keys for providers
       "type": "api_key",
       "provider": "openai",
       "key": "sk-..."
+    },
+    "openrouter:default": {
+      "type": "api_key",
+      "provider": "openrouter",
+      "key": "sk-or-..."
     }
   }
 }
 ```
+
+Gemini does not need an auth profile entry here; it is read directly from `GEMINI_API_KEY` in `openclaw-secrets.env`.
 
 ### Run the Setup
 
@@ -207,8 +216,11 @@ Create a Slack bot programmatically:
 # 1. Get a config token from https://api.slack.com/apps
 #    → Your App Configuration Tokens → Generate Token
 
-# 2. Create the bot
-scripts/create-slack-bot.sh <your-config-token>
+# 2. Create the bot from the repo root (recommended)
+macos/scripts/create-slack-bot.sh <your-config-token> --manifest shared/slack-app-manifest.json
+
+#    Or, if you're already in macos/:
+scripts/create-slack-bot.sh <your-config-token> --manifest ../shared/slack-app-manifest.json
 
 # 3. Then manually:
 #    - Generate an app-level token (xapp-...) for Socket Mode
@@ -216,7 +228,7 @@ scripts/create-slack-bot.sh <your-config-token>
 #    - Copy the bot token (xoxb-...)
 ```
 
-The manifest at `shared/slack-app-manifest.json` includes all required scopes.
+The manifest lives at `shared/slack-app-manifest.json`. Run the script from the repo root or pass `--manifest` explicitly, because the script's built-in default path does not point there.
 
 ## Post-Setup (Manual)
 

@@ -5,5 +5,5 @@ created: 2026-01-01T00:00:00Z
 
 steps:
   - type: config_set
-    path: models.default
-    value: "anthropic/claude-sonnet-4-20250514"
+    path: tools.web.search.provider
+    value: "gemini"

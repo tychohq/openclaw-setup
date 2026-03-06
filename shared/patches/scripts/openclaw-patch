@@ -396,6 +396,9 @@ exec_step_extension() {
   if [[ "$enable_flag" == "true" ]]; then
     OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw plugins enable "$ext_name" 2>/dev/null \
       || warn "Could not auto-enable extension $ext_name"
+  else
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_HOME/openclaw.json" openclaw plugins disable "$ext_name" 2>/dev/null \
+      || warn "Could not leave extension disabled: $ext_name"
   fi
 }
 

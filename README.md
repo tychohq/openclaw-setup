@@ -62,7 +62,7 @@ steps:
 **How it works:**
 
 1. Patches live in `shared/patches/patches/` as YAML files
-2. On any instance, pull the repo and run `openclaw-patch apply`
+2. On any instance, pull the repo and run `openclaw-patch apply --deployment <your-deployment>`
 3. Already-applied patches are skipped (idempotent)
 4. Patches apply in chronological order by `created` timestamp
 5. Target filtering lets you scope patches to specific deployments
