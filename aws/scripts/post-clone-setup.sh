@@ -413,13 +413,14 @@ log "Step 7b: Checklist..."
 
 CHECKLIST_SRC="$REPO_DIR/shared/checklist"
 CHECKLIST_DEST="$OPENCLAW_DIR/checklist"
-CHECKLIST_CONF="$OPENCLAW_DIR/checklist.conf"
+CHECKLIST_CONF="$CHECKLIST_DEST/checklist.conf"
 
 if [ -d "$CHECKLIST_SRC" ]; then
   if [ -d "$CHECKLIST_DEST" ]; then
     log "  Checklist already deployed — updating."
   fi
   cp -r "$CHECKLIST_SRC" "$CHECKLIST_DEST"
+  mkdir -p "$CHECKLIST_DEST/runs"
   log "  Checklist scripts deployed to $CHECKLIST_DEST"
 
   # Create default config if none exists

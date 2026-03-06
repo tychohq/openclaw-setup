@@ -1,65 +1,85 @@
 # openclaw-setup
 
-Everything you need to get [OpenClaw](https://github.com/openclaw/openclaw) running — on a Mac or on AWS. Clone this repo, fill in your API keys, and follow the guide for your platform.
+Setup scripts and configuration templates for deploying [OpenClaw](https://github.com/openclaw/openclaw) on new machines — macOS or AWS.
 
-## Choose Your Path
+## Where to Start
 
-| Platform | What it does | Guide |
-|----------|-------------|-------|
-| **macOS** | Sets up a Mac from scratch — Homebrew, apps, CLI tools, and OpenClaw | [macos/README.md](macos/README.md) |
-| **AWS** | Deploys OpenClaw to an EC2 instance via Terraform | [aws/README.md](aws/README.md) |
+| I want to... | Go to |
+|---|---|
+| Set up OpenClaw on a **Mac** | [macos/README.md](macos/README.md) |
+| Deploy OpenClaw on **AWS** (EC2) | [aws/README.md](aws/README.md) |
 
-## What You Need
+Both paths get you from zero to a running OpenClaw instance with your AI providers, chat channels, and workspace configured.
 
-Before you start, you'll need:
+## What You'll Need
 
-1. **At least one AI provider API key** — [Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys), or [OpenRouter](https://openrouter.ai/keys)
-2. **At least one chat channel** — [Discord bot token](https://discord.com/developers/applications), [Telegram bot](https://t.me/BotFather), or [Slack app](https://api.slack.com/apps)
+Regardless of platform, you'll need:
 
-Both setup paths use the same config templates in [`shared/config/`](shared/config/):
+- **At least one AI provider API key** — Anthropic, OpenAI, OpenRouter, or Gemini
+- **At least one chat channel** — Discord bot token, Telegram bot token, or Slack tokens
+- Optionally: Brave Search API key, additional provider keys
 
-| File | What goes in it |
-|------|----------------|
-| `openclaw-config.template.json` | Channel config, model settings, gateway options |
-| `openclaw-env.template` | API keys and tokens (`ANTHROPIC_API_KEY`, `DISCORD_TOKEN`, etc.) |
-| `openclaw-auth-profiles.template.json` | Provider auth profiles (API keys per provider) |
-
-Copy these templates, fill in your values, and point the setup script at them. Both the macOS and AWS guides walk you through this. The filled-in files are gitignored and never committed.
-
-## Patches
-
-After your instance is running, you can layer on features using the **patch system** in [`shared/patches/`](shared/patches/README.md).
-
-Patches are small YAML manifests that configure OpenClaw features — things like web search, audio transcription, browser control, memory, and security hardening. Instead of manually editing `openclaw.json`, you apply patches:
-
-```bash
-# Pull the latest patches and apply them
-cd ~/openclaw-setup
-git pull
-./shared/patches/scripts/openclaw-patch sync --deployment my-deployment
-```
-
-Each patch declares what it does, what env vars it needs, and which config keys it sets. Already-applied patches are skipped automatically. See the [patches README](shared/patches/README.md) for the full reference.
-
-**Available patches:** agent-defaults, agent-collaboration, agent-permissions, audio-transcription, browser-config, discord-channel, inject-datetime, memory-config, model-providers, security-config, session-config, signal-channel, skills-config, slack-channel, telegram-channel, web-search.
+The setup guides walk you through where to get each of these.
 
 ## Repo Structure
 
 ```
 openclaw-setup/
-├── aws/                # AWS EC2 deployment (Terraform + setup wizard)
-├── macos/              # macOS provisioning (Homebrew, apps, dotfiles, OpenClaw)
-├── shared/
-│   ├── checklist/      # Post-deploy health check scripts
-│   ├── config/         # Config and env templates (start here)
-│   ├── cron-jobs/      # Starter cron job definitions
-│   ├── patches/        # Declarative patch system
-│   ├── scripts/        # Setup, bootstrap, and audit scripts
-│   ├── skills/         # Custom OpenClaw skills
-│   └── workspace/      # Workspace starter files (SOUL.md, docs, tools)
-├── web/                # Setup catalog frontend (browse patches, skills, cron jobs)
-└── meta/               # Internal docs, PRDs, and project notes
+├── aws/              # AWS EC2 deployment (Terraform + setup wizard)
+├── macos/            # macOS provisioning (Homebrew, apps, OpenClaw)
+├── shared/           # Resources shared across platforms
+│   ├── checklist/    # Deployment health check system
+│   ├── config/       # Config and env templates
+│   ├── cron-jobs/    # Starter cron job definitions
+│   ├── patches/      # Declarative config patch system
+│   ├── scripts/      # Setup, bootstrap, and audit scripts
+│   ├── skills/       # Custom OpenClaw skills
+│   └── workspace/    # Workspace starter files (SOUL.md, docs, tools, etc.)
+├── web/              # Setup catalog frontend (browse patches, skills, cron jobs)
+├── scripts/          # Build scripts (catalog index generation)
+└── meta/             # Internal docs, PRDs, and project notes
 ```
+
+## Config Patches
+
+The **patch system** (`shared/patches/`) lets you manage OpenClaw configuration as declarative YAML manifests. Instead of SSHing into each instance to tweak config, you author patches once and apply them everywhere.
+
+Each patch is a YAML file that declares what it changes:
+
+```yaml
+id: web-search
+description: "Enable Brave web search"
+targets: ["*"]
+requires:
+  - BRAVE_SEARCH_API_KEY
+steps:
+  - type: config_set
+    path: web.provider
+    value: "brave"
+  - type: restart
+```
+
+**How it works:**
+
+1. Patches live in `shared/patches/patches/` as YAML files
+2. On any instance, pull the repo and run `openclaw-patch apply`
+3. Already-applied patches are skipped (idempotent)
+4. Patches apply in chronological order by `created` timestamp
+5. Target filtering lets you scope patches to specific deployments
+
+**Available patches:** model providers, web search, browser config, memory, security, session settings, channel-specific configs (Discord, Telegram, Slack, Signal), agent defaults, and more.
+
+See [shared/patches/README.md](shared/patches/README.md) for the full patch reference and step types.
+
+## Health Checks
+
+After setup, verify everything works with the deployment health check:
+
+```bash
+bash shared/checklist/checklist.sh
+```
+
+Checks gateway status, channels, CLI tools, disk space, credentials, and more. See [shared/checklist/README.md](shared/checklist/README.md).
 
 ## License
 

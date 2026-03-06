@@ -50,9 +50,18 @@ aws configure
 
 ## What You Need
 
-- AWS account with admin access
-- At least one chat channel token (Discord or Telegram)
-- At least one LLM provider API key (Anthropic or OpenAI)
+- **AWS account** with permissions to create VPC, EC2, IAM, S3, and DynamoDB resources
+- **At least one AI provider API key:**
+  - Anthropic (`ANTHROPIC_API_KEY`) — [console.anthropic.com](https://console.anthropic.com/)
+  - OpenAI (`OPENAI_API_KEY`) — [platform.openai.com](https://platform.openai.com/)
+  - OpenRouter (`OPENROUTER_API_KEY`) — [openrouter.ai](https://openrouter.ai/)
+  - Gemini (`GEMINI_API_KEY`) — [aistudio.google.com](https://aistudio.google.com/)
+- **At least one chat channel token:**
+  - Discord (`DISCORD_TOKEN`) — [Discord Developer Portal](https://discord.com/developers/applications) → Bot → Token. Also need your user ID and guild ID.
+  - Telegram (`TELEGRAM_BOT_TOKEN`) — [@BotFather](https://t.me/BotFather) → /newbot
+  - Slack (`SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN`) — see [Slack setup docs](https://docs.openclaw.ai/channels/slack)
+
+The Quick Start wizard will prompt you for these. For the Advanced Deployment path, you'll put them in config files (see below).
 
 ## Non-Interactive Deploy (`--auto`)
 
