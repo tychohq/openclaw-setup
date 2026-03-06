@@ -6,15 +6,11 @@ For advanced users, see [Advanced Deployment](#advanced-deployment) below.
 
 ## Cost (On-Demand, eu-central-1)
 
-- EC2 t4g.medium (2 vCPU, 4 GB RAM): $0.0336 per hour
-	- 730 hours/month: $0.0336 x 730 = ~$24.53
-- EBS gp3 storage (30 GB): $0.0952 per GB-month
-	- 30 GB: $0.0952 x 30 = ~$2.86
+The setup wizard currently estimates the default deployment at **~$17/month** in `eu-central-1`.
 
-Estimated monthly total: ~$27.39 (~$27/month)
+Treat that as a rough starting point, not a bill guarantee. Actual cost varies with region, instance type, EBS volume size, data transfer, snapshots, and other AWS usage.
 
-Excludes data transfer, snapshots, and any optional add-ons. Always review the latest AWS pricing for your region.
-Pricing varies by region and instance size; adjust `instance_type` and `ebs_volume_size` in [terraform/variables.tf](terraform/variables.tf).
+If you change `instance_type` or `ebs_volume_size` in [terraform/variables.tf](terraform/variables.tf), expect the monthly total to change as well.
 
 ## Quick Start (First Time)
 
@@ -51,9 +47,10 @@ aws configure
 ## What You Need
 
 - **AWS account** with permissions to create VPC, EC2, IAM, S3, and DynamoDB resources
-- **At least one AI provider API key:**
+- **For the current AWS wizard (`./setup.sh`), at least one supported AI provider API key:**
   - Anthropic (`ANTHROPIC_API_KEY`) — [console.anthropic.com](https://console.anthropic.com/)
   - OpenAI (`OPENAI_API_KEY`) — [platform.openai.com](https://platform.openai.com/)
+- **Other provider keys you may still want after deploy:**
   - OpenRouter (`OPENROUTER_API_KEY`) — [openrouter.ai](https://openrouter.ai/)
   - Gemini (`GEMINI_API_KEY`) — [aistudio.google.com](https://aistudio.google.com/)
 - **At least one chat channel token:**
@@ -61,7 +58,7 @@ aws configure
   - Telegram (`TELEGRAM_BOT_TOKEN`) — [@BotFather](https://t.me/BotFather) → /newbot
   - Slack (`SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN`) — see [Slack setup docs](https://docs.openclaw.ai/channels/slack)
 
-The Quick Start wizard will prompt you for these. For the Advanced Deployment path, you'll put them in config files (see below).
+`./setup.sh --auto` only accepts Anthropic or OpenAI as satisfying the provider requirement, and the interactive wizard currently only prompts for those same two providers. OpenRouter and Gemini can still be added after deploy via your OpenClaw config/auth files, but they are not part of the current wizard validation flow.
 
 ## Non-Interactive Deploy (`--auto`)
 
@@ -75,7 +72,7 @@ vim .env
 ./setup.sh --auto
 ```
 
-Auto mode validates that all required fields are present before doing anything. If something's missing, it tells you exactly what and exits — no partial deploys.
+Auto mode validates that all required fields are present before doing anything. If something's missing, it tells you exactly what and exits — no partial deploys. For AI providers, `--auto` currently validates only `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`.
 
 Great for CI, scripting, or re-deploys where your `.env` is already populated.
 
@@ -130,173 +127,51 @@ If you have an existing deployment with local state, just re-run `setup.sh`. It 
 
 ## Advanced Deployment
 
-Deploy OpenClaw fully configured at boot using content from the monorepo. This gives you full control over workspace files, custom skills, cron jobs, and auth profiles.
+The current EC2 deployment path is driven by `./setup.sh`, not the older Terraform-only flow with `openclaw-secrets.json`, `workspace_files`, `custom_skills`, and `cron_jobs` variables documented in earlier versions of this README.
 
-### Monorepo Layout
+### Current Flow
 
-Everything lives in one repo — `openclaw-setup`:
-
-```
-openclaw-setup/
-├── openclaw-secrets.json                 # ← fill in (from shared/config/openclaw-config.template.json)
-├── openclaw-secrets.env                  # ← fill in (from shared/config/openclaw-env.template)
-├── openclaw-auth-profiles.json           # ← fill in (from shared/config/openclaw-auth-profiles.template.json)
-├── shared/
-│   ├── workspace/                        # workspace files (SOUL.md, USER.md, docs/, tools/, ...)
-│   ├── skills/                           # custom skills (email/, clawdstrike/, ...)
-│   ├── cron-jobs/                        # cron job JSON specs
-│   └── config/                           # config templates
-└── aws/
-    └── terraform/
-        └── terraform.tfvars              # all file() paths point into ../../shared/ or ../
-```
-
-Secrets files are gitignored and live at the repo root. The `terraform.tfvars` wires them to the instance using `file()` references.
-
-### Advanced Workflow
-
-**1. Clone the repo:**
+Use a deployment directory and point the setup wizard at it:
 
 ```bash
-cd ~/projects
-git clone https://github.com/tychohq/openclaw-setup.git
+./setup.sh --config ~/openclaw-deployments/my-agent
+./setup.sh --config ~/openclaw-deployments/my-agent --auto
 ```
 
-**2. Fill in your secrets:**
+The deployment directory can contain:
 
-```bash
-cd ~/projects/openclaw-setup
-# Start from the templates, then fill in your tokens and API keys:
-cp shared/config/openclaw-config.template.json openclaw-secrets.json
-cp shared/config/openclaw-env.template          openclaw-secrets.env
-cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
+- `.env` — wizard defaults and the required source for `--auto`
+- `config-bundle.json` — extra OpenClaw config to apply after clone/setup
+- `cron-selections.json` — cron job selections to enable at boot
+- `skills-list.json` — ClawHub skills to preinstall
 
-# Edit each file:
-#   openclaw-secrets.json       — channels, models, agent settings, gateway config
-#   openclaw-secrets.env        — API keys (ANTHROPIC_API_KEY, TELEGRAM_TOKEN, ...)
-#   openclaw-auth-profiles.json — provider auth profiles
-```
+`setup.sh` base64-encodes those bundle files into environment variables (`CONFIG_BUNDLE_B64`, `CRON_SELECTIONS_B64`, `CLAWHUB_SKILLS`) and the slim cloud-init flow applies them on the EC2 instance.
 
-These three files are gitignored and never committed.
+### Real Repo Examples
 
-**3. Configure Terraform:**
+If you want concrete examples from this repo, use files that actually exist today:
 
-```bash
-cd ~/projects/openclaw-setup/aws/terraform
-cp terraform.tfvars.advanced.example terraform.tfvars
-# Edit owner_name, timezone, region, or skill lists as needed.
-```
+- Skills: `shared/skills/clawdstrike/SKILL.md`, `shared/skills/doc-layers/SKILL.md`
+- Cron jobs: `shared/cron-jobs/self-reflection.json`, `shared/cron-jobs/error-log-digest.json`
 
-**4. Deploy:**
+### Updating a Deployment
 
-```bash
-terraform init && terraform apply
-```
+For durable changes, update the files in your deployment directory and re-run `./setup.sh` (or `./setup.sh --config <dir> --auto`).
 
-Cloud-init runs automatically on first boot. After ~2 minutes, OpenClaw is running as a systemd user service.
-
-### Updating Config and Content
-
-**To update workspace files, skills, cron jobs, or config:**
-
-1. Edit the relevant files in the repo
-2. Re-run `terraform apply` from `aws/terraform/`
-
-When `workspace_files`, `custom_skills`, `cron_jobs`, or the config variables change, Terraform detects a `user_data` change and **replaces the instance**. Your updated content is baked in at boot on the new instance.
-
-**For config-only changes without instance replacement** (secrets rotation, small tweaks):
-
-SSM in and update the files directly:
+For one-off edits, connect over SSM and update the live files directly:
 
 ```bash
 aws ssm start-session --target <instance-id> --region <region>
 
 # Edit config:
-sudo -u openclaw vi ~/.openclaw/openclaw.json
+sudo -u ec2-user vi /home/ec2-user/.openclaw/openclaw.json
 
 # Update .env (API keys):
-sudo -u openclaw vi ~/.openclaw/.env
-sudo -u openclaw systemctl --user restart openclaw-gateway
+sudo -u ec2-user vi /home/ec2-user/.openclaw/.env
+sudo -u ec2-user systemctl --user restart openclaw-gateway
 ```
 
-Use `terraform apply` (instance replacement) for any change you want to survive a full rebuild. Use SSM for quick, ephemeral edits.
-
-### Config Files
-
-| File | Template | Destination on instance |
-|------|----------|------------------------|
-| `openclaw-secrets.json` | `shared/config/openclaw-config.template.json` | `~/.openclaw/openclaw.json` |
-| `openclaw-secrets.env` | `shared/config/openclaw-env.template` | `~/.openclaw/.env` (chmod 600) |
-| `openclaw-auth-profiles.json` | `shared/config/openclaw-auth-profiles.template.json` | `~/.openclaw/agents/main/agent/auth-profiles.json` (chmod 600) |
-
-### Workspace Files
-
-Pre-populate the OpenClaw workspace with your identity and soul files. Supports nested paths — parent directories are created automatically:
-
-```hcl
-workspace_files = {
-  "SOUL.md"                      = file("../../shared/workspace/SOUL.md")
-  "USER.md"                      = file("../../shared/workspace/USER.md")
-  "docs/openclaw-playbook.md"    = file("../../shared/workspace/docs/openclaw-playbook.md")
-  "tools/browser.md"             = file("../../shared/workspace/tools/browser.md")
-  "scripts/pre-commit-secrets.sh" = file("../../shared/workspace/scripts/pre-commit-secrets.sh")
-  "bootstrap/README.md"          = file("../../shared/workspace/bootstrap/README.md")
-}
-```
-
-Files are written to `/home/openclaw/.openclaw/workspace/` on the instance. See `terraform.tfvars.advanced.example` for the complete list.
-
-If `scripts/pre-commit-secrets.sh` is included, it is automatically installed as the git pre-commit hook for the `~/.openclaw` repo.
-
-### Custom Skills
-
-Deploy custom skill directories to `~/.openclaw/skills/`. Each skill is a map of file paths to contents, supporting nested paths:
-
-```hcl
-custom_skills = {
-  "email" = {
-    "SKILL.md" = file("../../shared/skills/email/SKILL.md")
-  }
-  "clawdstrike" = {
-    "SKILL.md"                    = file("../../shared/skills/clawdstrike/SKILL.md")
-    "references/threat-model.md"  = file("../../shared/skills/clawdstrike/references/threat-model.md")
-    "scripts/collect_verified.sh" = file("../../shared/skills/clawdstrike/scripts/collect_verified.sh")
-  }
-}
-```
-
-### Cron Jobs
-
-Write cron job JSON specs to `~/.openclaw/workspace/cron-jobs/`. After the instance is up, ask OpenClaw to register them:
-
-```hcl
-cron_jobs = {
-  "daily-digest"   = file("../../shared/cron-jobs/daily-digest.json")
-  "weekly-report"  = file("../../shared/cron-jobs/weekly-report.json")
-}
-```
-
-### clawhub Skills
-
-Pre-install clawhub skills at boot:
-
-```hcl
-clawhub_skills = [
-  "agent-browser",
-  "research",
-  "commit",
-  "diagrams",
-  "github",
-]
-```
-
-### Extra Packages
-
-Install additional system packages via dnf:
-
-```hcl
-extra_packages = ["golang", "python3-pip", "chromium"]
-```
+The current deploy runs as `ec2-user`, with OpenClaw files under `/home/ec2-user/.openclaw/`. 
 
 ---
 
@@ -306,12 +181,9 @@ extra_packages = ["golang", "python3-pip", "chromium"]
 
 **Wizard secrets handling**: The setup wizard writes secrets only to `/tmp/` temp files and passes them via `-var` flags. Temp files are cleaned up after apply. No secrets are written to the repo directory.
 
-**Recommended approach**: Store your secrets at the repo root and reference them with `file()`:
-```hcl
-openclaw_config_json = file("../openclaw-secrets.json")
-```
+**Recommended approach**: Keep your deployment inputs in the directory you pass to `./setup.sh --config` — typically `.env`, plus optional `config-bundle.json`, `cron-selections.json`, and `skills-list.json` — and let the setup wizard encode them for cloud-init.
 
-The secrets files (`openclaw-secrets.*`, `openclaw-auth-profiles.json`) are gitignored and never committed.
+Keep any secret-bearing files out of git.
 
 ---
 
@@ -321,17 +193,17 @@ The secrets files (`openclaw-secrets.*`, `openclaw-auth-profiles.json`) are giti
 # Connect to the instance (SSM shell)
 aws ssm start-session --target <instance-id> --region <region>
 
-# Run onboarding as the openclaw user (if not pre-configured)
-sudo -u openclaw openclaw onboard --install-daemon
+# Run onboarding as the instance user (if not pre-configured)
+sudo -u ec2-user openclaw onboard --install-daemon
 
 # View install log
 tail -f /var/log/openclaw-install.log
 
 # View gateway logs (user service)
-sudo -u openclaw journalctl --user -u openclaw-gateway -f
+sudo -u ec2-user journalctl --user -u openclaw-gateway -f
 
 # Restart gateway (user service)
-sudo -u openclaw systemctl --user restart openclaw-gateway
+sudo -u ec2-user systemctl --user restart openclaw-gateway
 
 # Access dashboard locally via SSM port-forwarding (run from your machine)
 aws ssm start-session \
@@ -343,7 +215,7 @@ aws ssm start-session \
 # Then open
 # http://localhost:18789/
 # If you see "gateway token mismatch", fetch the token with:
-# sudo -u openclaw openclaw config get gateway.auth.token
+# sudo -u ec2-user openclaw config get gateway.auth.token
 
 # Destroy everything
 ./setup.sh --destroy

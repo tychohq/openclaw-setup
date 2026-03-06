@@ -1,0 +1,11 @@
+[Unit]
+Description=OpenClaw Safe Upgrade
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__WORKING_DIRECTORY__
+ExecStart=/bin/bash -lc '__EXEC_COMMAND__'
+StandardOutput=append:__TIMER_LOG__
+StandardError=append:__TIMER_LOG__

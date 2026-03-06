@@ -62,14 +62,14 @@ steps:
 **How it works:**
 
 1. Patches live in `shared/patches/patches/` as YAML files
-2. On any instance, pull the repo and run `openclaw-patch apply`
+2. On any instance, pull the repo and run `openclaw-patch apply --deployment <your-deployment>`
 3. Already-applied patches are skipped (idempotent)
 4. Patches apply in chronological order by `created` timestamp
 5. Target filtering lets you scope patches to specific deployments
 
 **Available patches:** model providers, web search, browser config, memory, security, session settings, channel-specific configs (Discord, Telegram, Slack, Signal), agent defaults, and more.
 
-See [shared/patches/README.md](shared/patches/README.md) for the full patch reference and step types.
+See [shared/patches/README.md](shared/patches/README.md) for the full patch reference and step types, and jump straight to the [CLI Reference](shared/patches/README.md#cli-reference) for command docs and examples.
 
 ## Health Checks
 
@@ -80,6 +80,44 @@ bash shared/checklist/checklist.sh
 ```
 
 Checks gateway status, channels, CLI tools, disk space, credentials, and more. See [shared/checklist/README.md](shared/checklist/README.md).
+
+## Safe Upgrades
+
+This repo includes a wrapper-based upgrade flow for OpenClaw that runs **outside** the gateway process, writes timestamped logs/backups, verifies health, and rolls back on failure.
+
+```bash
+bash shared/scripts/openclaw-upgrade --dry-run
+bash shared/scripts/openclaw-upgrade --channel stable
+bash shared/scripts/openclaw-upgrade --channel stable --with-patches --deployment mac-mini
+bash shared/scripts/openclaw-upgrade-timer install --platform macos --mode apply --channel stable
+bash shared/scripts/openclaw-upgrade-timer install --platform linux --mode notify-only --channel beta
+```
+
+What it does:
+
+- Uses `~/.openclaw/.upgrade-lock` to prevent overlapping runs
+- Logs to `~/.openclaw/logs/upgrade-<timestamp>.log`
+- Backs up state to `~/.openclaw/backups/upgrade-<timestamp>/`
+- Runs `openclaw update --yes --no-restart --json`
+- Restarts via `launchctl` or `systemctl --user`
+- Polls `openclaw health --json`
+- Verifies cron jobs and skills are still present
+- Restores config and rolls back the version if post-update checks fail
+- Optionally runs `openclaw-patch sync --deployment <name>` after a healthy upgrade
+
+Timer support:
+
+- `shared/scripts/openclaw-upgrade-timer` installs launchd or systemd user timers
+- Templates live in `shared/templates/launchd/` and `shared/templates/systemd/`
+- Timer install enforces `update.auto.enabled=false` to avoid overlapping auto-updates
+
+Optional defaults live in `shared/config/openclaw-upgrade.env.template`, which you can copy to `~/.openclaw/openclaw-upgrade.env`.
+
+Run the shell tests with:
+
+```bash
+bash shared/scripts/tests/run-tests.sh
+```
 
 ## License
 

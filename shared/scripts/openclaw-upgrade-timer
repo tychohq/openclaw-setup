@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+UPGRADE_SCRIPT="$SCRIPT_DIR/openclaw-upgrade"
+SYSTEMD_SERVICE_TEMPLATE="$REPO_ROOT/shared/templates/systemd/openclaw-upgrade.service"
+SYSTEMD_TIMER_TEMPLATE="$REPO_ROOT/shared/templates/systemd/openclaw-upgrade.timer"
+LAUNCHD_TEMPLATE="$REPO_ROOT/shared/templates/launchd/ai.openclaw.upgrade.plist"
+OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
+CONFIG_FILE="$OPENCLAW_HOME/openclaw-upgrade.env"
+
+PLATFORM="auto"
+MODE="apply"
+CHANNEL="stable"
+DEPLOYMENT="${OPENCLAW_UPGRADE_DEPLOYMENT:-}"
+WITH_PATCHES=false
+DRY_RUN=false
+COMMAND=""
+
+usage() {
+  cat <<'USAGE'
+Usage: openclaw-upgrade-timer <install|uninstall|status|enable|disable|run-now> [options]
+
+Options:
+  --platform <auto|macos|linux>
+  --mode <apply|notify-only>
+  --channel <stable|beta|dev>
+  --deployment <name>
+  --with-patches
+  --dry-run
+  --help
+USAGE
+}
+
+log() { printf '[openclaw-upgrade-timer] %s\n' "$*"; }
+warn() { printf '[openclaw-upgrade-timer] WARN: %s\n' "$*" >&2; }
+fail() { printf '[openclaw-upgrade-timer] ERROR: %s\n' "$*" >&2; }
+
+load_config_file() {
+  if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
+  fi
+  MODE="${OPENCLAW_UPGRADE_MODE:-$MODE}"
+  CHANNEL="${OPENCLAW_UPGRADE_CHANNEL:-$CHANNEL}"
+  DEPLOYMENT="${OPENCLAW_UPGRADE_DEPLOYMENT:-$DEPLOYMENT}"
+  if [[ "${OPENCLAW_UPGRADE_WITH_PATCHES:-}" == "true" ]]; then WITH_PATCHES=true; fi
+}
+
+parse_args() {
+  [[ $# -lt 1 ]] && { usage >&2; return 1; }
+  COMMAND="$1"
+  shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --platform) shift; PLATFORM="${1:-}" ;;
+      --mode) shift; MODE="${1:-}" ;;
+      --channel) shift; CHANNEL="${1:-}" ;;
+      --deployment) shift; DEPLOYMENT="${1:-}" ;;
+      --with-patches) WITH_PATCHES=true ;;
+      --dry-run) DRY_RUN=true ;;
+      --help|-h) usage; return 2 ;;
+      *) fail "Unknown argument: $1"; return 1 ;;
+    esac
+    shift || true
+  done
+}
+
+validate_args() {
+  case "$PLATFORM" in auto|macos|linux) ;; *) fail "--platform must be auto, macos, or linux"; return 1 ;; esac
+  case "$MODE" in apply|notify-only) ;; *) fail "--mode must be apply or notify-only"; return 1 ;; esac
+  case "$CHANNEL" in stable|beta|dev) ;; *) fail "--channel must be stable, beta, or dev"; return 1 ;; esac
+  case "$COMMAND" in install|uninstall|status|enable|disable|run-now) ;; *) fail "Unknown command: $COMMAND"; return 1 ;; esac
+  if $WITH_PATCHES && [[ -z "$DEPLOYMENT" ]]; then fail "--with-patches requires --deployment or OPENCLAW_UPGRADE_DEPLOYMENT"; return 1; fi
+}
+
+resolve_platform() {
+  if [[ "$PLATFORM" != "auto" ]]; then return 0; fi
+  case "$(uname -s)" in
+    Darwin) PLATFORM="macos" ;;
+    Linux) PLATFORM="linux" ;;
+    *) fail "Unsupported platform: $(uname -s)"; return 1 ;;
+  esac
+}
+
+escape_sed() { printf '%s' "$1" | sed -e 's/[\\/&]/\\&/g'; }
+
+build_exec_command() {
+  local cmd
+  cmd="$(printf '%q' "$UPGRADE_SCRIPT") --mode $(printf '%q' "$MODE") --channel $(printf '%q' "$CHANNEL")"
+  [[ -n "$DEPLOYMENT" ]] && cmd+=" --deployment $(printf '%q' "$DEPLOYMENT")"
+  $WITH_PATCHES && cmd+=" --with-patches"
+  printf '%s\n' "$cmd"
+}
+
+ensure_paths() {
+  if $DRY_RUN; then
+    log "Dry run: would ensure $OPENCLAW_HOME/logs and $OPENCLAW_HOME/backups exist"
+    return 0
+  fi
+  mkdir -p "$OPENCLAW_HOME/logs" "$OPENCLAW_HOME/backups"
+}
+
+ensure_auto_update_disabled() {
+  local value
+  value="$(openclaw config get update.auto.enabled --json 2>/dev/null || true)"
+  [[ "$value" != "true" ]] && return 0
+  if $DRY_RUN; then
+    warn "Dry run: would set update.auto.enabled=false"
+    return 0
+  fi
+  log "Disabling update.auto.enabled to avoid timer conflicts"
+  openclaw config set update.auto.enabled false
+}
+
+render_template() {
+  local template="$1" output="$2" exec_command timer_log workdir
+  exec_command="$(build_exec_command)"
+  timer_log="$OPENCLAW_HOME/logs/timer.log"
+  workdir="$REPO_ROOT"
+  sed \
+    -e "s|__EXEC_COMMAND__|$(escape_sed "$exec_command")|g" \
+    -e "s|__TIMER_LOG__|$(escape_sed "$timer_log")|g" \
+    -e "s|__WORKING_DIRECTORY__|$(escape_sed "$workdir")|g" \
+    "$template" > "$output"
+}
+
+run_or_print() {
+  if $DRY_RUN; then
+    log "Dry run: $(printf '%q ' "$@")"
+    return 0
+  fi
+  "$@"
+}
+
+install_linux() {
+  local systemd_dir service_dest timer_dest preview_dir
+  systemd_dir="$HOME/.config/systemd/user"
+  service_dest="$systemd_dir/openclaw-upgrade.service"
+  timer_dest="$systemd_dir/openclaw-upgrade.timer"
+  ensure_paths
+  ensure_auto_update_disabled
+  if $DRY_RUN; then
+    log "Dry run: would render $service_dest and $timer_dest"
+    preview_dir="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-upgrade-timer.XXXXXX")"
+    render_template "$SYSTEMD_SERVICE_TEMPLATE" "$preview_dir/openclaw-upgrade.service"
+    render_template "$SYSTEMD_TIMER_TEMPLATE" "$preview_dir/openclaw-upgrade.timer"
+    cat "$preview_dir/openclaw-upgrade.service"
+    echo '---'
+    cat "$preview_dir/openclaw-upgrade.timer"
+    rm -rf "$preview_dir"
+    return 0
+  fi
+  mkdir -p "$systemd_dir"
+  render_template "$SYSTEMD_SERVICE_TEMPLATE" "$service_dest"
+  render_template "$SYSTEMD_TIMER_TEMPLATE" "$timer_dest"
+  run_or_print systemctl --user daemon-reload
+  run_or_print systemctl --user enable --now openclaw-upgrade.timer
+}
+
+uninstall_linux() {
+  local systemd_dir service_dest timer_dest
+  systemd_dir="$HOME/.config/systemd/user"
+  service_dest="$systemd_dir/openclaw-upgrade.service"
+  timer_dest="$systemd_dir/openclaw-upgrade.timer"
+  run_or_print systemctl --user disable --now openclaw-upgrade.timer || true
+  if $DRY_RUN; then log "Dry run: would remove $service_dest and $timer_dest"; return 0; fi
+  rm -f "$service_dest" "$timer_dest"
+  run_or_print systemctl --user daemon-reload
+}
+
+status_linux() { systemctl --user status openclaw-upgrade.timer --no-pager || true; systemctl --user list-timers openclaw-upgrade.timer --no-pager || true; }
+enable_linux() { run_or_print systemctl --user enable --now openclaw-upgrade.timer; }
+disable_linux() { run_or_print systemctl --user disable --now openclaw-upgrade.timer; }
+run_now_linux() { run_or_print systemctl --user start openclaw-upgrade.service; }
+
+install_macos() {
+  local launch_agents_dir plist_dest uid preview_file
+  launch_agents_dir="$HOME/Library/LaunchAgents"
+  plist_dest="$launch_agents_dir/ai.openclaw.upgrade.plist"
+  uid="$(id -u)"
+  ensure_paths
+  ensure_auto_update_disabled
+  if $DRY_RUN; then
+    log "Dry run: would render $plist_dest"
+    preview_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-upgrade.plist.XXXXXX")"
+    render_template "$LAUNCHD_TEMPLATE" "$preview_file"
+    cat "$preview_file"
+    rm -f "$preview_file"
+    return 0
+  fi
+  mkdir -p "$launch_agents_dir"
+  render_template "$LAUNCHD_TEMPLATE" "$plist_dest"
+  run_or_print launchctl bootout "gui/$uid" "$plist_dest" || true
+  run_or_print launchctl bootstrap "gui/$uid" "$plist_dest"
+  run_or_print launchctl enable "gui/$uid/ai.openclaw.upgrade" || true
+}
+
+uninstall_macos() {
+  local plist_dest uid
+  plist_dest="$HOME/Library/LaunchAgents/ai.openclaw.upgrade.plist"
+  uid="$(id -u)"
+  run_or_print launchctl bootout "gui/$uid" "$plist_dest" || true
+  run_or_print launchctl disable "gui/$uid/ai.openclaw.upgrade" || true
+  if $DRY_RUN; then log "Dry run: would remove $plist_dest"; return 0; fi
+  rm -f "$plist_dest"
+}
+
+status_macos() { launchctl print "gui/$(id -u)/ai.openclaw.upgrade" || true; }
+
+enable_macos() {
+  local plist_dest uid
+  plist_dest="$HOME/Library/LaunchAgents/ai.openclaw.upgrade.plist"
+  uid="$(id -u)"
+  [[ ! -f "$plist_dest" ]] && { fail "LaunchAgent plist not installed: $plist_dest"; return 1; }
+  run_or_print launchctl bootstrap "gui/$uid" "$plist_dest" || true
+  run_or_print launchctl enable "gui/$uid/ai.openclaw.upgrade" || true
+}
+
+disable_macos() {
+  local plist_dest uid
+  plist_dest="$HOME/Library/LaunchAgents/ai.openclaw.upgrade.plist"
+  uid="$(id -u)"
+  run_or_print launchctl bootout "gui/$uid" "$plist_dest" || true
+  run_or_print launchctl disable "gui/$uid/ai.openclaw.upgrade" || true
+}
+
+run_now_macos() { run_or_print launchctl kickstart -k "gui/$(id -u)/ai.openclaw.upgrade"; }
+
+main() {
+  local parse_rc=0
+  load_config_file
+  parse_args "$@" || parse_rc=$?
+  if [[ "$parse_rc" -ne 0 ]]; then
+    [[ "$parse_rc" -eq 2 ]] && return 0
+    return 1
+  fi
+  validate_args || return 1
+  resolve_platform || return 1
+  case "$PLATFORM" in
+    linux)
+      case "$COMMAND" in
+        install) install_linux ;;
+        uninstall) uninstall_linux ;;
+        status) status_linux ;;
+        enable) enable_linux ;;
+        disable) disable_linux ;;
+        run-now) run_now_linux ;;
+      esac
+      ;;
+    macos)
+      case "$COMMAND" in
+        install) install_macos ;;
+        uninstall) uninstall_macos ;;
+        status) status_macos ;;
+        enable) enable_macos ;;
+        disable) disable_macos ;;
+        run-now) run_now_macos ;;
+      esac
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

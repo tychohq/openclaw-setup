@@ -1,0 +1,11 @@
+[Unit]
+Description=Run OpenClaw Safe Upgrade on a schedule
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=1800
+Persistent=true
+Unit=openclaw-upgrade.service
+
+[Install]
+WantedBy=timers.target
