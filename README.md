@@ -81,6 +81,44 @@ bash shared/checklist/checklist.sh
 
 Checks gateway status, channels, CLI tools, disk space, credentials, and more. See [shared/checklist/README.md](shared/checklist/README.md).
 
+## Safe Upgrades
+
+This repo includes a wrapper-based upgrade flow for OpenClaw that runs **outside** the gateway process, writes timestamped logs/backups, verifies health, and rolls back on failure.
+
+```bash
+bash shared/scripts/openclaw-upgrade --dry-run
+bash shared/scripts/openclaw-upgrade --channel stable
+bash shared/scripts/openclaw-upgrade --channel stable --with-patches --deployment mac-mini
+bash shared/scripts/openclaw-upgrade-timer install --platform macos --mode apply --channel stable
+bash shared/scripts/openclaw-upgrade-timer install --platform linux --mode notify-only --channel beta
+```
+
+What it does:
+
+- Uses `~/.openclaw/.upgrade-lock` to prevent overlapping runs
+- Logs to `~/.openclaw/logs/upgrade-<timestamp>.log`
+- Backs up state to `~/.openclaw/backups/upgrade-<timestamp>/`
+- Runs `openclaw update --yes --no-restart --json`
+- Restarts via `launchctl` or `systemctl --user`
+- Polls `openclaw health --json`
+- Verifies cron jobs and skills are still present
+- Restores config and rolls back the version if post-update checks fail
+- Optionally runs `openclaw-patch sync --deployment <name>` after a healthy upgrade
+
+Timer support:
+
+- `shared/scripts/openclaw-upgrade-timer` installs launchd or systemd user timers
+- Templates live in `shared/templates/launchd/` and `shared/templates/systemd/`
+- Timer install enforces `update.auto.enabled=false` to avoid overlapping auto-updates
+
+Optional defaults live in `shared/config/openclaw-upgrade.env.template`, which you can copy to `~/.openclaw/openclaw-upgrade.env`.
+
+Run the shell tests with:
+
+```bash
+bash shared/scripts/tests/run-tests.sh
+```
+
 ## License
 
 MIT

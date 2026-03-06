@@ -401,6 +401,7 @@ run_update() {
   printf '%s' "$UPDATE_RESULT_JSON" | jq -e '.status == "ok"' >/dev/null 2>&1 || { fail "Update JSON did not report status=ok"; return 1; }
   FINAL_VERSION="$(json_get "$UPDATE_RESULT_JSON" '.after.version')"
   [[ -z "$PREVIOUS_VERSION" ]] && PREVIOUS_VERSION="$(json_get "$UPDATE_RESULT_JSON" '.before.version')"
+  return 0
 }
 
 restore_file_from_backup() {
