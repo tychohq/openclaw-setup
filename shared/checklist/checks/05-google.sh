@@ -174,25 +174,35 @@ check_google() {
             return
         fi
 
-        # Read account email names from Keychain entry metadata (no token read required).
-        # Entries with "token:email@domain" in the account field; skip "token:default:..." aliases.
+        # Read account emails from platform-specific credential stores.
+        # macOS: Keychain entry metadata. Linux: keyring directory filenames.
+        # Skip "token:default:..." aliases in both cases.
         local keychain_emails=""
         if $IS_MACOS; then
             keychain_emails=$(security dump-keychain 2>/dev/null | \
                 grep -oE '"token:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]+"' | \
                 sed 's/"token://; s/"//' | sort -u)
+        else
+            # Linux: gog stores tokens as files named "token:<email>" in the keyring dir
+            local keyring_dir="$HOME/.config/gogcli/keyring"
+            if [ -d "$keyring_dir" ]; then
+                keychain_emails=$(ls "$keyring_dir" 2>/dev/null | \
+                    grep -E '^token:' | grep -v '^token:default:' | \
+                    sed 's/^token://' | sort -u)
+            fi
         fi
 
         # Config-specified account overrides auto-detected list
         local primary_account="${conf_account:-$(echo "$keychain_emails" | head -1)}"
 
         if [ -n "$keychain_emails" ]; then
-            local email_count
+            local email_count store_label
             email_count=$(echo "$keychain_emails" | wc -l | tr -d ' ')
+            $IS_MACOS && store_label="keychain" || store_label="keyring"
             local email_list
             email_list=$(echo "$keychain_emails" | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
             report_result "google.accounts" "pass" \
-                "$email_count account(s) in keychain: $email_list"
+                "$email_count account(s) in $store_label: $email_list"
         else
             report_result "google.accounts" "pass" "gog authenticated (credentials found)"
         fi
