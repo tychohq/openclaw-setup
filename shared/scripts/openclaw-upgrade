@@ -237,11 +237,9 @@ setup_logging() {
 
 mode_label() {
   if [[ "$DRY_RUN" == true ]]; then
-    printf 'dry-run
-'
+    printf 'dry-run\n'
   else
-    printf '%s
-' "$MODE"
+    printf '%s\n' "$MODE"
   fi
 }
 
@@ -251,11 +249,9 @@ service_summary() {
   runtime="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.runtime.status')"
 
   if [[ -n "$runtime" ]]; then
-    printf '%s (loaded=%s, runtime=%s)
-' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}" "$runtime"
+    printf '%s (loaded=%s, runtime=%s)\n' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}" "$runtime"
   else
-    printf '%s (loaded=%s)
-' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}"
+    printf '%s (loaded=%s)\n' "${SERVICE_LABEL:-unknown}" "${loaded:-unknown}"
   fi
 }
 
@@ -268,23 +264,17 @@ describe_upgrade_path() {
   install_kind="$(json_get "$UPDATE_PREVIEW_JSON" '.installKind')"
 
   if [[ "$switch_to_git" == "true" ]]; then
-    printf 'package -> git checkout
-'
+    printf 'package -> git checkout\n'
   elif [[ "$switch_to_package" == "true" ]]; then
-    printf 'git checkout -> package install
-'
+    printf 'git checkout -> package install\n'
   elif [[ -n "$preview_mode" ]]; then
-    printf '%s update via %s
-' "${update_install_kind:-${install_kind:-unknown}}" "$preview_mode"
+    printf '%s update via %s\n' "${update_install_kind:-${install_kind:-unknown}}" "$preview_mode"
   elif [[ -n "$install_kind" ]]; then
-    printf '%s update
-' "$install_kind"
+    printf '%s update\n' "$install_kind"
   elif [[ -n "$INSTALL_KIND" ]]; then
-    printf '%s update
-' "$INSTALL_KIND"
+    printf '%s update\n' "$INSTALL_KIND"
   else
-    printf 'unknown
-'
+    printf 'unknown\n'
   fi
 }
 

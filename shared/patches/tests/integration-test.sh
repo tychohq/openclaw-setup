@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Note: This integration test uses the real `openclaw` binary and typically
+# takes about 60 seconds because each config write triggers full validation.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-lib.sh"
 
@@ -16,13 +19,32 @@ assert_config_check() {
   fi
 }
 
+capture_apply_summary() {
+  local deployment="$1"
+  local label="$2"
+  local output_file="$TEST_ROOT/${label}-apply.log"
+
+  if apply_patches "$deployment" >"$output_file" 2>&1; then
+    cat "$output_file" >>"$TEST_APPLY_LOG"
+  else
+    cat "$output_file" >&2
+    return 1
+  fi
+
+  local summary_line
+  summary_line="$(grep 'Summary:' "$output_file" | tail -1 || true)"
+  [[ -n "$summary_line" ]] || die "missing patch summary in $output_file"
+  printf '%s\n' "$summary_line"
+}
+
 info "Setting up isolated OpenClaw home"
 setup_test_env --gateway
 use_production_patches_dir
+TEST_APPLY_LOG="$TEST_ROOT/integration-test.apply.log"
 
 info "Applying production patches for deployment=$DEPLOYMENT"
-first_output="$(apply_patches "$DEPLOYMENT")"
-echo "$first_output"
+first_output="$(capture_apply_summary "$DEPLOYMENT" first)"
+printf '%s\n' "$first_output"
 
 jq empty "$OPENCLAW_CONFIG_PATH" >/dev/null
 ok 'Patched config is valid JSON'
@@ -70,8 +92,8 @@ extension_dir="$(extension_install_dir inject-datetime)"
 ok "inject-datetime extension installed at $extension_dir"
 
 applied_before="$(applied_patch_count)"
-second_output="$(apply_patches "$DEPLOYMENT")"
-echo "$second_output"
+second_output="$(capture_apply_summary "$DEPLOYMENT" second)"
+printf '%s\n' "$second_output"
 echo "$second_output" | grep -q 'Summary: 0 applied'
 applied_after="$(applied_patch_count)"
 [[ "$applied_before" == "$applied_after" ]]

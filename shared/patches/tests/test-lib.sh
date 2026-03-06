@@ -28,7 +28,7 @@ require_openclaw_bin() {
 }
 
 write_dummy_env_file() {
-  cat > "$TEST_ENV_FILE" <<'EOF'
+  cat > "$TEST_ENV_FILE" <<'EOF_ENV'
 ANTHROPIC_API_KEY=dummy-anthropic
 OPENAI_API_KEY=dummy-openai
 GEMINI_API_KEY=dummy-gemini
@@ -41,7 +41,7 @@ SIGNAL_PHONE_NUMBER=+15555550123
 SLACK_BOT_TOKEN=dummy-slack-bot
 SLACK_APP_TOKEN=dummy-slack-app
 SLACK_OWNER_USER_ID=dummy-slack-owner
-EOF
+EOF_ENV
 }
 
 export_dummy_env_file() {
@@ -150,7 +150,49 @@ cleanup_test_env() {
   export PATH="${TEST_ORIGINAL_PATH:-$PATH}"
 }
 
+pids_listening_on_port() {
+  local port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u || true
+    return 0
+  fi
+
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | sort -u || true
+    return 0
+  fi
+}
+
+clear_listeners_on_port() {
+  local port="$1"
+  local pids
+  local attempt
+
+  pids="$(pids_listening_on_port "$port")"
+  [[ -z "$pids" ]] && return 0
+
+  info "Stopping leftover gateway on port $port"
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill "$pid" 2>/dev/null || true
+  done <<< "$pids"
+
+  for attempt in $(seq 1 10); do
+    sleep 0.2
+    pids="$(pids_listening_on_port "$port")"
+    [[ -z "$pids" ]] && return 0
+  done
+
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    kill -9 "$pid" 2>/dev/null || true
+  done <<< "$pids"
+}
+
 start_test_gateway() {
+  clear_listeners_on_port "$TEST_GATEWAY_PORT"
+
   (
     cd "$TEST_GATEWAY_CWD"
     "$OPENCLAW_BIN" gateway run \
