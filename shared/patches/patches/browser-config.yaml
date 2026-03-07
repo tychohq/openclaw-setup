@@ -5,4 +5,4 @@ created: 2026-03-01T22:10:00Z
 
 steps:
   - type: exec
-    command: "if [ -n \"${DISPLAY:-}\" ] || [ \"$(uname)\" = Darwin ]; then openclaw config set browser.headless false; else openclaw config set browser.headless true; fi"
+    command: test "$(uname)" = Darwin -o -n "${DISPLAY:-}" && openclaw config set browser.headless false || openclaw config set browser.headless true
