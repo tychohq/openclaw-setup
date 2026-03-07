@@ -5,4 +5,4 @@ created: 2026-03-01T22:10:00Z
 
 steps:
   - type: exec
-    command: "if [ -n \"$DISPLAY\" ] || [ \"$(uname)\" = 'Darwin' ]; then OPENCLAW_CONFIG_PATH=\"${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json\" openclaw config set browser.headless false; else OPENCLAW_CONFIG_PATH=\"${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json\" openclaw config set browser.headless true; fi"
+    command: "if [ -n \"${DISPLAY:-}\" ] || [ \"$(uname)\" = Darwin ]; then openclaw config set browser.headless false; else openclaw config set browser.headless true; fi"
