@@ -9,10 +9,10 @@ set -euo pipefail
 #   openclaw-patch validate [patch]               Validate patch manifests
 #   openclaw-patch publish                        Validate, commit, and push
 #   openclaw-patch pull                           Git pull latest patches
-#   openclaw-patch apply --deployment <name>      Apply pending patches
-#   openclaw-patch status --deployment <name>     Show applied/pending patches
-#   openclaw-patch sync --deployment <name>       Pull + apply in one shot
-#   openclaw-patch diff --deployment <name>       Show what would change
+#   openclaw-patch apply [-d <name>]               Apply pending patches
+#   openclaw-patch status [-d <name>]              Show applied/pending patches
+#   openclaw-patch sync [-d <name>]                Pull + apply in one shot
+#   openclaw-patch diff [-d <name>]                Show what would change
 #
 # Environment:
 #   OPENCLAW_PATCHES_DIR   Override the repo root (default: auto-detect)
@@ -797,7 +797,7 @@ cmd_apply() {
     shift
   done
 
-  [[ -z "$deployment" ]] && die "Usage: openclaw-patch apply --deployment <name>"
+  [[ -z "$deployment" ]] && deployment="*"
 
   need_cmd jq
   init_state
@@ -893,11 +893,15 @@ cmd_status() {
     shift
   done
   
-  [[ -z "$deployment" ]] && die "Usage: openclaw-patch status --deployment <name>"
+  [[ -z "$deployment" ]] && deployment="*"
   
   init_state
   
-  echo "Patch status for deployment: $deployment"
+  if [[ "$deployment" == "*" ]]; then
+    echo "Patch status (all targets):"
+  else
+    echo "Patch status for deployment: $deployment"
+  fi
   echo ""
   
   local pending=0
@@ -971,13 +975,13 @@ case "$cmd" in
     echo "  validate [name]               Validate patch manifests"
     echo "  publish                       Validate, commit, and push"
     echo "  pull                          Git pull latest patches"
-    echo "  apply -d <deployment>         Apply pending patches"
-    echo "  status -d <deployment>        Show applied/pending patches"
-    echo "  sync -d <deployment>          Pull + apply in one shot"
-    echo "  diff -d <deployment>          Show what would change (dry run)"
+    echo "  apply [-d <name>]             Apply pending patches"
+    echo "  status [-d <name>]            Show applied/pending patches"
+    echo "  sync [-d <name>]              Pull + apply in one shot"
+    echo "  diff [-d <name>]              Show what would change (dry run)"
     echo ""
     echo "Options:"
-    echo "  --deployment, -d <name>       Deployment name (e.g. opensesame, mac-mini)"
+    echo "  --deployment, -d <name>       Filter patches by deployment name (default: all)"
     echo "  --dry-run                     Show what would happen without doing it"
     echo ""
     echo "Environment:"

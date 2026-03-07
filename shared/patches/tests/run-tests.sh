@@ -230,15 +230,39 @@ test_idempotency() {
 test_target_filter_match() {
   setup_test_env --fixtures
   load_fixture_patch test-target-filter.yaml
-  apply_patches opensesame >/dev/null
+  apply_patches prod-server >/dev/null
   [[ -f "$OPENCLAW_HOME/workspace/target-only.txt" ]]
 }
 
 test_target_filter_skip() {
   setup_test_env --fixtures
   load_fixture_patch test-target-filter.yaml
-  apply_patches mac-mini >/dev/null
+  apply_patches dev-laptop >/dev/null
   [[ ! -f "$OPENCLAW_HOME/workspace/target-only.txt" ]]
+}
+
+test_apply_without_deployment() {
+  setup_test_env --fixtures
+  load_fixture_patch test-exec-step.yaml
+
+  cd "$TEST_ROOT"
+  OPENCLAW_HOME="$OPENCLAW_HOME" \
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" \
+    OPENCLAW_PATCHES_DIR="$OPENCLAW_PATCHES_DIR" \
+    bash "$PATCH_CLI" apply >/dev/null
+  [[ -f "$OPENCLAW_HOME/exec-marker.txt" ]]
+  grep -q "test-exec-marker" "$OPENCLAW_HOME/exec-marker.txt"
+}
+
+test_status_without_deployment() {
+  setup_test_env --fixtures
+  local output
+  cd "$TEST_ROOT"
+  output="$(OPENCLAW_HOME="$OPENCLAW_HOME" \
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" \
+    OPENCLAW_PATCHES_DIR="$OPENCLAW_PATCHES_DIR" \
+    bash "$PATCH_CLI" status 2>&1)"
+  echo "$output" | grep -q 'all targets'
 }
 
 test_chronological_ordering() {
@@ -409,6 +433,8 @@ run_test 'full multi-step patch'           test_full_patch
 run_test 'idempotency (second apply=nop)'  test_idempotency
 run_test 'target filter (match)'           test_target_filter_match
 run_test 'target filter (skip)'            test_target_filter_skip
+run_test 'apply without --deployment'      test_apply_without_deployment
+run_test 'status without --deployment'     test_status_without_deployment
 run_test 'chronological ordering'          test_chronological_ordering
 run_test 'validate with no patches'        test_validate_no_patches
 run_test 'list shows empty'                test_list_empty

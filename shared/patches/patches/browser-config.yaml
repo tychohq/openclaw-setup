@@ -1,9 +1,8 @@
 id: browser-config
-description: "Headful browser for desktop deployments (skip on headless servers)"
+description: "Auto-detect headful/headless browser mode based on display availability"
 targets: ["*"]
 created: 2026-03-01T22:10:00Z
 
 steps:
-  - type: config_set
-    path: browser.headless
-    value: "false"
+  - type: exec
+    command: "if [ -n \"$DISPLAY\" ] || [ \"$(uname)\" = 'Darwin' ]; then OPENCLAW_CONFIG_PATH=\"${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json\" openclaw config set browser.headless false; else OPENCLAW_CONFIG_PATH=\"${OPENCLAW_HOME:-$HOME/.openclaw}/openclaw.json\" openclaw config set browser.headless true; fi"
