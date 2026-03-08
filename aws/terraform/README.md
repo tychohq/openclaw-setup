@@ -1,5 +1,7 @@
 # Terraform
 
+If you want guided help before you run Terraform, open [confidants.dev](https://confidants.dev).
+
 ```bash
 terraform init
 terraform apply

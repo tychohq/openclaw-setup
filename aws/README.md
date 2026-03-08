@@ -4,6 +4,8 @@ One command to deploy OpenClaw on AWS. The setup wizard collects everything inli
 
 For advanced users, see [Advanced Deployment](#advanced-deployment) below.
 
+If you want guided help while you go through the AWS wizard, open [confidants.dev](https://confidants.dev) before you start.
+
 ## Cost (On-Demand, eu-central-1)
 
 The setup wizard currently estimates the default deployment at **~$17/month** in `eu-central-1`.

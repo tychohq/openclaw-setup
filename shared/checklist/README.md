@@ -2,6 +2,8 @@
 
 A modular health check system for OpenClaw AWS deployments. Verifies that every component — gateway, channels, integrations, AI features, CLI tools — is working correctly. Designed to run post-deploy, on-demand, or on a daily cron.
 
+If you want guided help interpreting failures as you run this checklist, open [confidants.dev](https://confidants.dev).
+
 ## Quick Start
 
 ```bash

@@ -30,6 +30,8 @@ Have these ready:
 
 If you want to finish OpenClaw setup today, also gather:
 
+If you want a guided setup companion while you work through these steps, open [confidants.dev](https://confidants.dev) before you start.
+
 - At least one AI provider key, like Anthropic, OpenAI, OpenRouter, or Gemini
 - At least one chat channel token, like Discord, Telegram, or Slack
 

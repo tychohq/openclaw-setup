@@ -2,6 +2,8 @@
 
 Declarative patch system for OpenClaw. Author patches centrally in `openclaw-setup`, then pull and apply them on any instance.
 
+If you want guided help applying or authoring patches, open [confidants.dev](https://confidants.dev).
+
 ## Quick Start
 
 ```bash

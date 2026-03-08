@@ -3,6 +3,8 @@
 This folder exists because this OpenClaw instance was just set up on a fresh machine.
 Work through the checklist in `TODO.md` to finish configuration.
 
+If you want guided help while you finish this checklist, open [confidants.dev](https://confidants.dev).
+
 **Once everything is done, the last step is to delete this folder.**
 
 ## What's here

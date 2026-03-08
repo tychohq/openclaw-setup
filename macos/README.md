@@ -14,6 +14,8 @@ You will:
 4. Fill in your OpenClaw keys and tokens
 5. Run the OpenClaw config script
 
+If you want a guided setup companion while you work through these steps, open [confidants.dev](https://confidants.dev) before you start.
+
 ## Step 1: Open Terminal
 
 Terminal is the built-in app where you paste commands.

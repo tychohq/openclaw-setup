@@ -2,6 +2,8 @@
 
 Ready-to-use cron job definitions for OpenClaw. These are starter templates — adjust schedules, models, and delivery channels to match your setup.
 
+If you want guided help choosing or wiring up these starter cron jobs, open [confidants.dev](https://confidants.dev).
+
 ## How to Install
 
 After OpenClaw is running, you can add these jobs via the OpenClaw API or by having your agent create them. The JSON files in this directory can be used as references.
