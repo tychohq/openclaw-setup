@@ -147,11 +147,13 @@ What you should see:
 
 ## Finish OpenClaw Setup
 
+The bootstrap command clones or updates this repo at `~/projects/openclaw-setup` automatically. The commands below assume you are running them from that folder.
+
 The Mac setup script prepares the machine. **OpenClaw configuration is the next step**, because the script cannot guess your secret keys.
 
 ### 1. Create your three local config files
 
-From the repo root:
+From the repo root (by default `~/projects/openclaw-setup` when you used the bootstrap command):
 
 ```bash
 cp shared/config/openclaw-config.template.json openclaw-secrets.json

@@ -149,7 +149,9 @@ What you should see:
 
 ## Step 7: Create your OpenClaw config files
 
-From the repo root, run:
+The bootstrap command clones or updates this repo at `~/projects/openclaw-setup` automatically. The commands below assume you are running them from that folder.
+
+From the repo root (by default `~/projects/openclaw-setup` when you used the bootstrap command), run:
 
 ```bash
 cp shared/config/openclaw-config.template.json openclaw-secrets.json
