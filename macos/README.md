@@ -171,6 +171,96 @@ For Discord, the most important fields are:
 
 Use this for provider auth profiles such as Anthropic, OpenAI, and OpenRouter.
 
+
+<details>
+<summary><strong>📱 Setting up a Discord Bot</strong></summary>
+
+1. Go to https://discord.com/developers/applications.
+2. Click **New Application**, give it a name such as `OpenClaw`, and create it.
+   - What you should see: a new app dashboard with your bot name at the top.
+3. Open the **Bot** tab in the left sidebar.
+4. Click **Reset Token** to get your bot token, then copy it immediately.
+   - What you should see: Discord shows the token once. After you leave, you will not be able to see the full token again.
+5. Under **Privileged Gateway Intents**, enable:
+   1. **Message Content Intent**
+   2. **Server Members Intent**
+   3. **Presence Intent**
+6. Go to **OAuth2** → **URL Generator**.
+7. Under **Scopes**, check:
+   1. `bot`
+   2. `applications.commands`
+8. Under **Bot Permissions**, check:
+   1. **Send Messages**
+   2. **Read Messages/View Channels**
+   3. **Read Message History**
+   4. **Add Reactions**
+   5. **Use Slash Commands**
+   6. **Manage Messages**
+   7. **Manage Threads**
+   8. **Create Public Threads**
+   9. **Create Private Threads**
+   10. **Send Messages in Threads**
+   11. **Embed Links**
+   12. **Attach Files**
+   13. **Use External Emojis**
+9. Copy the generated URL at the bottom and open it in your browser to invite the bot to your server.
+   - What you should see: Discord asks which server to add the bot to, then shows an authorization screen.
+10. To find your Discord User ID, enable **Developer Mode** in Discord under **App Settings** → **Advanced** → **Developer Mode**, then right-click your name and choose **Copy User ID**.
+11. To find your Server ID, right-click the server icon and choose **Copy Server ID**.
+
+Values needed for OpenClaw config:
+
+- `DISCORD_TOKEN` in the `.env` file
+- Your user ID in the authorized senders list
+- Your server or guild ID in the Discord channel config
+
+</details>
+
+<details>
+<summary><strong>📱 Setting up a Telegram Bot</strong></summary>
+
+1. Open Telegram and search for `@BotFather`.
+2. Send `/newbot`.
+3. Choose a display name for your bot, such as `OpenClaw`.
+4. Choose a username that ends in `bot`, such as `my_openclaw_bot`.
+5. BotFather gives you an API token. Copy it.
+   - What you should see: a message from BotFather with a token that looks like `123456789:AA...`.
+6. Send `/setprivacy` to `@BotFather`, select your bot, and choose **Disable** so the bot can read all messages in groups.
+   - What you should see: BotFather confirms that privacy mode is now disabled.
+7. To find your Telegram User ID, search for `@userinfobot`, start a chat, and read the numeric user ID it gives you.
+8. Optional: send `/setdescription` and `/setabouttext` to `@BotFather` if you want to customize your bot profile.
+
+Values needed for OpenClaw config:
+
+- `TELEGRAM_BOT_TOKEN` in the `.env` file
+- Your numeric user ID for authorized senders
+
+</details>
+
+<details>
+<summary><strong>📱 Setting up a Slack Bot</strong></summary>
+
+1. Go to https://api.slack.com/apps.
+2. Click **Create New App** → **From a manifest**.
+3. Select your workspace.
+4. If the repo has a manifest file at `shared/slack-app-manifest.json`, paste its contents into the manifest editor. Otherwise create the app manually with:
+   1. A bot name
+   2. **Socket Mode** enabled
+   3. Bot token scopes: `chat:write`, `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `mpim:history`, `mpim:read`, `reactions:read`, `reactions:write`, `files:read`, `files:write`, `users:read`
+   4. Event subscriptions: `message.channels`, `message.groups`, `message.im`, `message.mpim`, `app_mention`
+   - What you should see: Slack accepts the manifest and creates an app configuration screen.
+5. Install the app to your workspace.
+6. Get the bot token from **OAuth & Permissions** by copying the **Bot User OAuth Token**. It starts with `xoxb-`.
+7. Get the app token from **Basic Information** → **App-Level Tokens** by generating a token with the `connections:write` scope. It starts with `xapp-`.
+   - What you should see: both tokens are shown in Slack after creation, with the prefixes above.
+
+Values needed for OpenClaw config:
+
+- `SLACK_BOT_TOKEN` in the `.env` file
+- `SLACK_APP_TOKEN` in the `.env` file
+
+</details>
+
 ## Step 8: Run OpenClaw setup
 
 ```bash
