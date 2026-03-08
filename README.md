@@ -37,24 +37,35 @@ If you want to finish OpenClaw setup today, also gather:
 
 ### 1. Paste this into Terminal
 
+If Claude Code is already logged in on this Mac, this is the recommended command:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash -s -- --handoff
 ```
 
 What this command does:
 
 - `curl` downloads the starter script from GitHub
-- `| bash` runs that script immediately
+- `| bash -s -- --handoff` runs that script and passes `--handoff` into `macos/setup.sh`
+- At the end of setup, Claude Code opens so it can help if anything breaks
 
 What you should see:
 
 - A box that says `Mac Mini Setup — Bootstrap`
 - A message asking for your Mac password
 - A message about Apple Command Line Tools if they are not installed yet
+- Claude Code opening near the end of setup if the install completes cleanly
 
-Short alias for the same flow:
+If Claude Code is not logged in yet, use the standard command instead:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
+```
+
+Short aliases for the same flows:
+
+```bash
+curl -fsSL mac.brennerspear.com | bash -s -- --handoff
 curl -fsSL mac.brennerspear.com | bash
 ```
 

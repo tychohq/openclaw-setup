@@ -31,25 +31,34 @@ What you should see:
 
 ## Step 2: Run the bootstrap command
 
-Paste this into Terminal and press `Return`:
+If Claude Code is already logged in on this Mac, paste this into Terminal and press `Return`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash -s -- --handoff
 ```
 
 Plain-English explanation:
 
 - `curl` downloads the starter script
-- `| bash` runs it
+- `| bash -s -- --handoff` runs it and passes `--handoff` into `macos/setup.sh`
+- At the end of setup, Claude Code opens so it can help if anything breaks
 
 What you should see:
 
 - `Mac Mini Setup — Bootstrap`
 - A request for your Mac password
+- Claude Code opening near the end of setup if the install completes cleanly
 
-Short alias for the same script:
+If Claude Code is not logged in yet, use the standard bootstrap command instead:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
+```
+
+Short aliases for the same script:
+
+```bash
+curl -fsSL mac.brennerspear.com | bash -s -- --handoff
 curl -fsSL mac.brennerspear.com | bash
 ```
 
@@ -316,7 +325,16 @@ What you should see:
 bash macos/setup.sh --dry-run
 ```
 
-### Run the full Mac setup from a cloned repo
+### Recommended: run the full Mac setup with Claude Code handoff
+
+If Claude Code is already logged in on this Mac:
+
+```bash
+cd ~/projects/openclaw-setup
+bash macos/setup.sh --handoff
+```
+
+If Claude Code is not logged in yet:
 
 ```bash
 cd ~/projects/openclaw-setup
@@ -329,7 +347,7 @@ bash macos/setup.sh
 bash macos/setup.sh --with-extensions
 ```
 
-### Start the optional Claude Code handoff at the end
+### If you skipped handoff the first time, rerun with Claude Code handoff
 
 ```bash
 bash macos/setup.sh --handoff
