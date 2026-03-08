@@ -20,15 +20,28 @@ echo "[$(date)] System packages installed."
 
 timedatectl set-timezone "${timezone}"
 
-# ── Install OpenClaw and Tools Globally ───────────────────────────────────────
+# ── Set up user-owned npm global prefix ───────────────────────────────────────
+# Install packages to ~/.npm-global instead of /usr/lib/node_modules so that
+# ec2-user can update them without sudo (required for openclaw-upgrade).
 
-npm install -g openclaw clawhub agent-browser mcporter
+su - ec2-user -c 'mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global'
+
+# Add ~/.npm-global/bin to PATH for ec2-user
+cat >> /home/ec2-user/.bashrc << 'BASHRC'
+
+# npm global prefix (user-owned, no sudo needed for installs/updates)
+export PATH="$HOME/.npm-global/bin:$PATH"
+BASHRC
+
+# ── Install OpenClaw and Tools ────────────────────────────────────────────────
+
+su - ec2-user -c 'export PATH="$HOME/.npm-global/bin:$PATH" && npm install -g openclaw clawhub agent-browser mcporter'
 echo "[$(date)] OpenClaw and tools installed."
 
 # ── Install Claude Code (native installer) ────────────────────────────────────
 
 su - ec2-user -c "curl -fsSL https://claude.ai/install.sh | bash" || \
-  npm install -g @anthropic-ai/claude-code  # fallback to npm if native fails
+  su - ec2-user -c 'export PATH="$HOME/.npm-global/bin:$PATH" && npm install -g @anthropic-ai/claude-code'
 echo "[$(date)] Claude Code installed."
 
 # ── Configure Claude Code ─────────────────────────────────────────────────────
@@ -79,14 +92,16 @@ mkdir -p /home/ec2-user/.config/systemd/user
 cat > /home/ec2-user/.config/systemd/user/openclaw-gateway.service << 'SERVICE'
 [Unit]
 Description=OpenClaw Gateway
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=%h
-ExecStart=/usr/bin/openclaw gateway
+ExecStart=%h/.npm-global/bin/openclaw gateway
 Restart=always
-RestartSec=10
+RestartSec=5
+Environment=PATH=%h/.npm-global/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=%h/.openclaw/.env
 
 [Install]

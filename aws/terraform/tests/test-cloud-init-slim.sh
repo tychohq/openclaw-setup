@@ -141,6 +141,10 @@ test_no_extra_packages_var() {
 
 # ── NPM Global Installs ─────────────────────────────────────────────────────
 
+test_npm_global_prefix_setup() {
+  grep -q 'npm config set prefix.*npm-global' "$TEMPLATE"
+}
+
 test_npm_global_tools() {
   grep -q 'npm install -g openclaw clawhub agent-browser mcporter' "$TEMPLATE"
 }
@@ -199,16 +203,21 @@ test_systemd_service_description() {
 }
 
 test_systemd_after_network() {
-  grep -q 'After=network.target' "$TEMPLATE"
+  grep -q 'After=network-online.target' "$TEMPLATE"
+  grep -q 'Wants=network-online.target' "$TEMPLATE"
 }
 
 test_systemd_exec_start() {
-  grep -q 'ExecStart=/usr/bin/openclaw gateway' "$TEMPLATE"
+  grep -q 'ExecStart=%h/.npm-global/bin/openclaw gateway' "$TEMPLATE"
 }
 
 test_systemd_restart_always() {
   grep -q 'Restart=always' "$TEMPLATE"
-  grep -q 'RestartSec=10' "$TEMPLATE"
+  grep -q 'RestartSec=5' "$TEMPLATE"
+}
+
+test_systemd_path_includes_npm_global() {
+  grep -q 'Environment=PATH=%h/.npm-global/bin' "$TEMPLATE"
 }
 
 test_systemd_environment_file() {
@@ -340,6 +349,7 @@ run_test "no extra_packages var"        test_no_extra_packages_var
 echo ""
 
 echo "NPM Global Installs:"
+run_test "npm global prefix setup"      test_npm_global_prefix_setup
 run_test "npm global tools"             test_npm_global_tools
 echo ""
 
@@ -366,6 +376,7 @@ run_test "service description"          test_systemd_service_description
 run_test "after network target"         test_systemd_after_network
 run_test "exec start"                   test_systemd_exec_start
 run_test "restart always"               test_systemd_restart_always
+run_test "path includes npm-global"     test_systemd_path_includes_npm_global
 run_test "environment file"             test_systemd_environment_file
 run_test "wanted by default"            test_systemd_wanted_by
 run_test "loginctl enable-linger"       test_loginctl_enable_linger
