@@ -97,6 +97,32 @@ What you should see:
 
 If the script stops, read the last `❌` message, fix that issue, and run the same command again. The setup is designed to be safe to rerun.
 
+### 4. If you have a Claude subscription, sign in to Claude Code
+
+The Mac setup installs Claude Code for you. If you sign in now, Claude Code can help with the rest of the setup.
+
+```bash
+claude auth login
+claude auth status --text
+```
+
+What these commands do:
+
+- `claude auth login` starts the Claude Code sign-in flow for your Anthropic account
+- `claude auth status --text` confirms whether Claude Code is signed in
+
+What you should see:
+
+- Claude Code opens a sign-in flow
+- A successful status message after you finish logging in
+
+If you want Claude Code to take over right away after that:
+
+```bash
+cd ~/projects/openclaw-setup
+bash macos/setup.sh --handoff
+```
+
 ## Optional: Preview First Without Changing Anything
 
 If you want to inspect the repo first:

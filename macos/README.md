@@ -106,7 +106,33 @@ If something fails:
 
 The script is safe to rerun.
 
-## Step 5: Optional preview mode
+## Step 5: If you have a Claude subscription, sign in to Claude Code
+
+The Mac setup installs Claude Code for you. If you sign in now, Claude Code can help with the rest of the setup.
+
+```bash
+claude auth login
+claude auth status --text
+```
+
+Plain-English explanation:
+
+- `claude auth login` starts the Claude Code sign-in flow for your Anthropic account
+- `claude auth status --text` confirms whether Claude Code is signed in
+
+What you should see:
+
+- Claude Code opens a sign-in flow
+- A successful status message after you finish logging in
+
+If you want Claude Code to take over right away after that:
+
+```bash
+cd ~/projects/openclaw-setup
+bash macos/setup.sh --handoff
+```
+
+## Step 6: Optional preview mode
 
 If you want to review the plan before changing anything:
 
@@ -121,7 +147,7 @@ What you should see:
 - `❓` items that would be installed
 - `✅` items that are already there
 
-## Step 6: Create your OpenClaw config files
+## Step 7: Create your OpenClaw config files
 
 From the repo root, run:
 
@@ -141,7 +167,7 @@ What you should see:
 - Usually no output at all
 - Three new files in the repo root
 
-## Step 7: Fill in the files
+## Step 8: Fill in the files
 
 You need at least:
 
@@ -270,7 +296,7 @@ Values needed for OpenClaw config:
 
 </details>
 
-## Step 8: Run OpenClaw setup
+## Step 9: Run OpenClaw setup
 
 ```bash
 bash shared/scripts/setup-openclaw.sh \
@@ -292,7 +318,7 @@ What you should see:
 - `✅ Config installed` or `✅ Config merged`
 - `✅ Gateway installed and started` or `✅ Gateway restarted`
 
-## Step 9: Check your install
+## Step 10: Check your install
 
 ```bash
 bash shared/scripts/setup-openclaw.sh --check
@@ -304,7 +330,7 @@ What you should see:
 - `✅ Config file exists`
 - `✅ OpenClaw installation looks good!`
 
-## Step 10: Optional workspace bootstrap
+## Step 11: Optional workspace bootstrap
 
 If you also want starter workspace files:
 
