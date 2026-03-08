@@ -97,6 +97,77 @@ What you should see:
 
 If the script stops, read the last `❌` message, fix that issue, and run the same command again. The setup is designed to be safe to rerun.
 
+
+<details>
+<summary><strong>🔎 What the bootstrap and setup scripts do by default</strong></summary>
+
+The live source of truth is [`macos/config.sh`](macos/config.sh).
+
+1. The bootstrap script:
+   1. Checks that you are on macOS
+   2. Requests admin access
+   3. Installs Apple Command Line Tools if needed
+   4. Clones or updates this repo at `~/projects/openclaw-setup`
+   5. Runs `macos/setup.sh`
+2. The setup script installs these command-line tools by default:
+   1. `fd`
+   2. `ffmpeg`
+   3. `fnm`
+   4. `fzf`
+   5. `gh`
+   6. `git-filter-repo`
+   7. `htop`
+   8. `imagemagick`
+   9. `jq`
+   10. `mas`
+   11. `tmux`
+   12. `uv`
+   13. `wget`
+3. The setup script installs these apps by default:
+   1. Arc
+   2. Google Chrome
+   3. Cursor
+   4. Visual Studio Code
+   5. Docker Desktop
+   6. Sublime Text
+   7. Warp
+   8. Slack
+   9. Discord
+   10. Zoom
+   11. 1Password
+   12. 1Password CLI
+   13. Raycast
+   14. Notion
+   15. ChatGPT
+   16. Claude
+   17. Spokenly
+   18. Spotify
+   19. VLC
+   20. Tailscale
+   21. Hack Nerd Font
+4. It also sets up:
+   1. Node.js 24 through `fnm`
+   2. Bun
+   3. Global Bun packages: `typescript`, `tsx`, `vercel`
+   4. Standard folders such as `~/projects` and `~/Documents/Screenshots`
+   5. Dock, Finder, global macOS, and screenshot defaults
+   6. Shell setup via `macos/scripts/setup-zshrc.sh`
+5. Optional things are available but not turned on by default:
+   1. Editor extensions with `--with-extensions`
+   2. OpenClaw globals and workspace bootstrap
+   3. Prezto and Powerlevel10k
+   4. Rust
+   5. Any apps or tools still commented out in `macos/config.sh`
+
+What you should see:
+
+- `>>>` stage headers as each part runs
+- `✅` lines for tools and apps that finished installing
+- A `Setup Summary` near the end
+
+</details>
+
+
 ### 4. If you have a Claude subscription, sign in to Claude Code
 
 The Mac setup installs Claude Code for you. If you sign in now, Claude Code can help with the rest of the setup.
