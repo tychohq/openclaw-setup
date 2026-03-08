@@ -84,7 +84,7 @@ The script then:
 
 1. Installs Homebrew
 2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, and `jq`
-3. Installs apps like Slack, Discord, Cursor, Arc, and 1Password
+3. Installs apps like Slack, Discord, Spokenly, Cursor, Arc, and 1Password
 4. Installs Bun and Node.js
 5. Applies Mac settings like Dock and Finder defaults
 6. Creates the standard folders used by this setup

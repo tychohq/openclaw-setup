@@ -87,7 +87,7 @@ It installs:
 
 - Homebrew
 - Common command-line tools
-- Apps like Arc, Chrome, Cursor, Slack, Discord, Raycast, and 1Password
+- Apps like Arc, Chrome, Cursor, Slack, Discord, Spokenly, Raycast, and 1Password
 - Bun
 - Node.js
 - Standard folders and Mac defaults

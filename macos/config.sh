@@ -88,6 +88,7 @@ CASKS=(
   # AI
   chatgpt
   claude
+  spokenly
 
   # Media
   spotify
