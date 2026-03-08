@@ -25,13 +25,22 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
-DEFAULT_MANIFEST="$REPO_DIR/config/slack-app-manifest.json"
+MACOS_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(dirname "$MACOS_DIR")"
+DEFAULT_MANIFEST="$REPO_ROOT/shared/slack-app-manifest.json"
 
 # ── Parse args ────────────────────────────────────────────────────────────────
 CONFIG_TOKEN="${1:-}"
 MANIFEST_PATH="$DEFAULT_MANIFEST"
 SECRETS_ENV=""
+
+if [[ "${CONFIG_TOKEN:-}" = "-h" || "${CONFIG_TOKEN:-}" = "--help" ]]; then
+  echo "Usage: $0 <config-token> [--manifest path] [--secrets path/to/secrets.env]"
+  echo ""
+  echo "Default manifest: $DEFAULT_MANIFEST"
+  echo "Get a config token from: https://api.slack.com/apps"
+  exit 0
+fi
 
 shift || true
 while [[ $# -gt 0 ]]; do
@@ -127,7 +136,7 @@ echo ""
 
 # ── 3. Save refresh token for later ──────────────────────────────────────────
 # Config tokens expire in 12h. Save context for potential re-use.
-STATE_FILE="$REPO_DIR/.slack-app-state.json"
+STATE_FILE="$REPO_ROOT/.slack-app-state.json"
 jq -n \
   --arg app_id "$APP_ID" \
   --arg client_id "$CLIENT_ID" \

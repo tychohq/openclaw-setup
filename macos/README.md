@@ -1,283 +1,289 @@
-# macOS Setup
+# Mac mini Setup
 
-One command to go from a fresh Mac to a fully configured machine with OpenClaw running.
+This guide is for setting up a **fresh Apple Silicon Mac mini** for OpenClaw.
+
+It is written for someone who may be brand new to Terminal.
+
+## What You Are About to Do
+
+You will:
+
+1. Open Terminal
+2. Run one starter command
+3. Let the script install the missing tools your Mac needs
+4. Fill in your OpenClaw keys and tokens
+5. Run the OpenClaw config script
+
+## Step 1: Open Terminal
+
+Terminal is the built-in app where you paste commands.
+
+To open it:
+
+1. Press `Command + Space`
+2. Type `Terminal`
+3. Press `Return`
+
+What you should see:
+
+- A window opens
+- The last line usually ends with `%` or `$`
+
+## Step 2: Run the bootstrap command
+
+Paste this into Terminal and press `Return`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
+```
+
+Plain-English explanation:
+
+- `curl` downloads the starter script
+- `| bash` runs it
+
+What you should see:
+
+- `Mac Mini Setup — Bootstrap`
+- A request for your Mac password
+
+Short alias for the same script:
 
 ```bash
 curl -fsSL mac.brennerspear.com | bash
 ```
 
-Or clone and run directly:
+## Step 3: Let Apple install Command Line Tools if needed
+
+On a brand-new Mac, macOS may open a pop-up window asking to install **Apple Command Line Tools**.
+
+This is normal.
+
+What you should do:
+
+1. Click **Install**
+2. Wait for it to finish
+3. Return to Terminal
+
+What you should see:
+
+- Either a pop-up asking you to install the tools, or
+- `✅ Apple Command Line Tools already installed`
+
+## Step 4: Wait for the machine setup to finish
+
+After that, the script runs `macos/setup.sh` for you.
+
+It installs:
+
+- Homebrew
+- Common command-line tools
+- Apps like Arc, Chrome, Cursor, Slack, Discord, Raycast, and 1Password
+- Bun
+- Node.js
+- Standard folders and Mac defaults
+
+What you should see:
+
+- Stage headings starting with `>>>`
+- `✅` lines for successful steps
+- A `Setup Summary` at the end
+
+If something fails:
+
+- Read the last `❌` line carefully
+- Fix that problem
+- Run the same bootstrap command again
+
+The script is safe to rerun.
+
+## Step 5: Optional preview mode
+
+If you want to review the plan before changing anything:
 
 ```bash
 git clone https://github.com/tychohq/openclaw-setup.git ~/projects/openclaw-setup
-cd ~/projects/openclaw-setup/macos
-./setup.sh
+cd ~/projects/openclaw-setup
+bash macos/setup.sh --dry-run
 ```
 
-## What It Does
+What you should see:
 
-1. Installs Xcode Command Line Tools
-2. Installs Homebrew
-3. Installs CLI tools (fd, fzf, gh, tmux, uv, etc.)
-4. Installs apps via Homebrew Cask (Slack, Discord, Arc, Cursor, 1Password, etc.)
-5. Installs Bun + global packages (TypeScript, Vercel CLI, etc.)
-6. Sets up Node.js via fnm
-7. Optionally installs Rust, Prezto/Powerlevel10k
-8. Applies macOS defaults (dock, Finder, dark mode, etc.)
-9. Creates directory structure
-10. Optionally installs and configures OpenClaw
+- `❓` items that would be installed
+- `✅` items that are already there
 
-Everything is **idempotent** — safe to run multiple times. It skips what's already installed and reports what changed.
+## Step 6: Create your OpenClaw config files
 
-## Setting Up OpenClaw
-
-After the base machine setup, configure OpenClaw with your API keys and chat channels.
-
-### What You Need
-
-You need **three files**, all created from templates in `shared/config/`:
-
-| File | Template | What goes in it |
-|---|---|---|
-| `openclaw-secrets.json` | `shared/config/openclaw-config.template.json` | Channel configs, model settings, gateway settings |
-| `openclaw-secrets.env` | `shared/config/openclaw-env.template` | API keys and tokens (see below) |
-| `openclaw-auth-profiles.json` | `shared/config/openclaw-auth-profiles.template.json` | Provider auth profiles (API keys per provider) |
+From the repo root, run:
 
 ```bash
-# From the repo root:
 cp shared/config/openclaw-config.template.json openclaw-secrets.json
-cp shared/config/openclaw-env.template          openclaw-secrets.env
+cp shared/config/openclaw-env.template openclaw-secrets.env
 cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
 ```
 
-These files are gitignored and never committed.
+Plain-English explanation:
 
-### Required Environment Variables (`.env`)
+- These commands make local copies of the template files
+- You will edit the local copies with your real keys and IDs
 
-At minimum, you need **one AI provider key** and **one channel token**:
+What you should see:
 
-```bash
-# Pick at least one AI provider:
+- Usually no output at all
+- Three new files in the repo root
+
+## Step 7: Fill in the files
+
+You need at least:
+
+- One AI provider key
+- One chat channel token
+
+### `openclaw-secrets.env`
+
+Use this for secret keys and tokens.
+
+Examples:
+
+```dotenv
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...
-GEMINI_API_KEY=AI...            # Gemini uses env-var auth directly; no auth profile entry needed
+GEMINI_API_KEY=AI...
 
-# Pick at least one chat channel:
-DISCORD_TOKEN=MTIz...          # Discord Developer Portal → Bot → Token
-TELEGRAM_BOT_TOKEN=123456:AB...  # @BotFather → /newbot
-SLACK_BOT_TOKEN=xoxb-...        # Slack app management
-SLACK_APP_TOKEN=xapp-...        # Slack Socket Mode token
-
-# Optional:
-BRAVE_SEARCH_API_KEY=BSA...     # Web search (brave.com/search/api)
+DISCORD_TOKEN=...
+TELEGRAM_BOT_TOKEN=...
+SLACK_BOT_TOKEN=...
+SLACK_APP_TOKEN=...
 ```
 
-`openclaw-auth-profiles.json` covers Anthropic, OpenAI, and OpenRouter. Gemini is configured from `openclaw-secrets.env` via `GEMINI_API_KEY`.
+### `openclaw-secrets.json`
 
-### Required Config (`openclaw-secrets.json`)
+Use this for channel setup and general OpenClaw settings.
 
-The config template has placeholders you need to fill in. The critical ones:
+For Discord, the most important fields are:
 
-**Discord** — you need your bot token, your Discord user ID, and your server (guild) ID:
-```json
-"channels": {
-  "discord": {
-    "enabled": true,
-    "token": "${DISCORD_TOKEN}",
-    "allowFrom": ["YOUR_DISCORD_USER_ID"],
-    "guilds": {
-      "YOUR_GUILD_ID": {
-        "requireMention": false
-      }
-    }
-  }
-}
-```
+- Your bot token
+- Your Discord user ID
+- Your server ID
 
-How to get the IDs:
-1. **Bot token** — [Discord Developer Portal](https://discord.com/developers/applications) → Create Application → Bot → Reset Token. Enable **Message Content Intent** under Bot settings.
-2. **Your user ID** — Enable Developer Mode (User Settings → Advanced → Developer Mode), then right-click your username → Copy User ID
-3. **Guild ID** — Right-click your server name → Copy Server ID
+### `openclaw-auth-profiles.json`
 
-**Invite the bot to your server:**
-```
-https://discord.com/api/oauth2/authorize?client_id=YOUR_APP_ID&permissions=412317273088&scope=bot
-```
+Use this for provider auth profiles such as Anthropic, OpenAI, and OpenRouter.
 
-**Telegram** — set `enabled: true` and add your Telegram user ID to `allowFrom`. Get a bot token from [@BotFather](https://t.me/BotFather).
-
-**Slack** — see the [Slack bot creation](#slack-bot-creation) section below.
-
-### Auth Profiles (`openclaw-auth-profiles.json`)
-
-This file maps provider names to actual API keys. Fill in the keys for providers you're using:
-
-```json
-{
-  "version": 1,
-  "profiles": {
-    "anthropic:default": {
-      "type": "api_key",
-      "provider": "anthropic",
-      "key": "sk-ant-..."
-    },
-    "openai:default": {
-      "type": "api_key",
-      "provider": "openai",
-      "key": "sk-..."
-    },
-    "openrouter:default": {
-      "type": "api_key",
-      "provider": "openrouter",
-      "key": "sk-or-..."
-    }
-  }
-}
-```
-
-Gemini does not need an auth profile entry here; it is read directly from `GEMINI_API_KEY` in `openclaw-secrets.env`.
-
-### Run the Setup
+## Step 8: Run OpenClaw setup
 
 ```bash
-# From the repo root:
-shared/scripts/setup-openclaw.sh \
+bash shared/scripts/setup-openclaw.sh \
   --config openclaw-secrets.json \
   --env openclaw-secrets.env \
   --auth-profiles openclaw-auth-profiles.json
-
-# Verify everything works:
-shared/scripts/setup-openclaw.sh --check
 ```
 
-This places your config at `~/.openclaw/openclaw.json`, your env at `~/.openclaw/.env`, installs the daemon, and starts the gateway.
+Plain-English explanation:
 
-### Bootstrap Workspace (Optional)
+- Copies your settings into `~/.openclaw/`
+- Installs the OpenClaw background service if needed
+- Starts or restarts the service
 
-After OpenClaw is running, populate the workspace with starter files (SOUL.md, docs, tools, skills, cron jobs):
+What you should see:
+
+- `>>> Setting up OpenClaw...`
+- `✅ Directory: ~/.openclaw`
+- `✅ Config installed` or `✅ Config merged`
+- `✅ Gateway installed and started` or `✅ Gateway restarted`
+
+## Step 9: Check your install
 
 ```bash
-shared/scripts/bootstrap-openclaw-workspace.sh
+bash shared/scripts/setup-openclaw.sh --check
 ```
 
-## Customization
+What you should see:
 
-Edit `config.sh` to add/remove apps, tools, and settings:
+- `✅ openclaw CLI found`
+- `✅ Config file exists`
+- `✅ OpenClaw installation looks good!`
+
+## Step 10: Optional workspace bootstrap
+
+If you also want starter workspace files:
 
 ```bash
-code config.sh
-
-# Preview what would change
-./setup.sh --dry-run
-
-# Run it
-./setup.sh
+bash shared/scripts/bootstrap-openclaw-workspace.sh
 ```
 
-### What's in `config.sh`
+What you should see:
 
-| Section | What you configure |
-|---|---|
-| `TAPS` | Homebrew taps |
-| `FORMULAE` | CLI tools (brew install) |
-| `CASKS` | GUI apps (brew install --cask) |
-| `BUN_GLOBALS` | Pinned global npm/bun packages |
-| `EXTENSIONS` | VS Code / Cursor extensions |
-| `DIRS` | Directories to create |
-| macOS defaults | Dock, Finder, dark mode, screenshots |
-| `INSTALL_OPENCLAW` | Whether to install OpenClaw |
-| `INSTALL_RUST` | Rust toolchain |
-| `POST_SCRIPTS` | Scripts to run after setup |
+- `>>> Setting up OpenClaw workspace...`
+- `✅` lines for folders and copied files
 
-### Usage
+## Helpful Commands
+
+### Preview the Mac setup without changing anything
 
 ```bash
-./setup.sh                          # Full setup
-./setup.sh --dry-run                # Preview changes
-./setup.sh --with-extensions        # Include VS Code / Cursor extensions
-./setup.sh --extensions-only        # Only install editor extensions
-./setup.sh --config my-config.sh    # Use a custom config file
+bash macos/setup.sh --dry-run
 ```
 
-### Claude Code Handoff
-
-Run the automated setup, then drop into Claude Code to interactively finish CLI logins, SSH keys, and app sign-ins:
+### Run the full Mac setup from a cloned repo
 
 ```bash
-curl -fsSL mac.brennerspear.com | bash -s -- --handoff
+cd ~/projects/openclaw-setup
+bash macos/setup.sh
 ```
 
-## Slack Bot Creation
-
-Create a Slack bot programmatically:
+### Include editor extensions too
 
 ```bash
-# 1. Get a config token from https://api.slack.com/apps
-#    → Your App Configuration Tokens → Generate Token
-
-# 2. Create the bot from the repo root (recommended)
-macos/scripts/create-slack-bot.sh <your-config-token> --manifest shared/slack-app-manifest.json
-
-#    Or, if you're already in macos/:
-scripts/create-slack-bot.sh <your-config-token> --manifest ../shared/slack-app-manifest.json
-
-# 3. Then manually:
-#    - Generate an app-level token (xapp-...) for Socket Mode
-#    - Install to your workspace
-#    - Copy the bot token (xoxb-...)
+bash macos/setup.sh --with-extensions
 ```
 
-The manifest lives at `shared/slack-app-manifest.json`. Run the script from the repo root or pass `--manifest` explicitly, because the script's built-in default path does not point there.
-
-## Post-Setup (Manual)
-
-Some things can't be automated:
-
-- **Sign into apps** — 1Password, Slack, Discord, Tailscale, Spotify, etc.
-- **CLI logins** — `gh auth login`, `vercel login`
-- **SSH keys** — copy or generate `~/.ssh/` keys
-- **Tailscale** — `tailscale up` (requires browser auth)
-- **iCloud** — sign in via System Settings
-
-## Scripts Reference
-
-**In `scripts/`** (macOS-specific):
-
-| Script | What it does |
-|---|---|
-| `setup-zshrc.sh` | Shell aliases, git shortcuts, AI agent commands |
-| `create-slack-bot.sh` | Create Slack bot via Manifest API |
-| `install-arc-extensions.sh` | Opens Chrome Web Store pages for extensions |
-| `import-keyboard-shortcuts.sh` | Imports macOS keyboard shortcut plists |
-
-**In `shared/scripts/`** (cross-platform):
-
-| Script | What it does |
-|---|---|
-| `setup-openclaw.sh` | Non-interactive OpenClaw configuration |
-| `bootstrap-openclaw-workspace.sh` | Workspace files, skills, cron jobs |
-| `audit-openclaw.sh` | Compare existing install against this template |
-| `smoke-test.sh` | Verify the model can respond |
-
-## Auditing an Existing Install
-
-Already have OpenClaw running? Compare your setup against this template:
+### Start the optional Claude Code handoff at the end
 
 ```bash
-cd ~/projects/openclaw-setup && shared/scripts/audit-openclaw.sh
+bash macos/setup.sh --handoff
 ```
 
-Reports missing files, config conflicts, and extras you could upstream.
+## Troubleshooting
 
-## For Teams
+### “Unknown argument”
 
-Fork this repo, edit `config.sh` for your team's stack, and give new hires the one-liner:
+You probably mistyped a flag. Run:
 
-- Pin specific tool versions your codebase needs
-- Add `POST_SCRIPTS` for team-specific config (VPN, internal tools)
-- Create multiple config files: `config-eng.sh`, `config-design.sh`
-- Pre-fill `openclaw-secrets.json` with non-sensitive defaults, have engineers add only their API keys
+```bash
+bash macos/setup.sh --help
+```
+
+### “Homebrew is not available. Cannot continue.”
+
+This usually means the account is not an admin account. Sign in as an admin or give this user admin access, then rerun the script.
+
+### “Permission denied” when running a script
+
+Use `bash ...` in front of the script path instead of double-clicking the file.
+
+### “Config file not found” during OpenClaw setup
+
+Make sure you ran the three `cp shared/config/...` commands from the repo root first.
+
+### OpenClaw service did not start
+
+Run:
+
+```bash
+bash shared/scripts/setup-openclaw.sh --check
+```
+
+Then read the last `❌` message and rerun the main setup command after fixing it.
+
+## Advanced: Slack bot creation
+
+If you want a Slack bot for OpenClaw, run:
+
+```bash
+bash macos/scripts/create-slack-bot.sh <your-config-token> --manifest shared/slack-app-manifest.json
+```
 
 ## License
 

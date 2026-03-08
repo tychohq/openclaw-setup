@@ -13,7 +13,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
+SHARED_DIR="$(dirname "$SCRIPT_DIR")"
 OPENCLAW_DIR="$HOME/.openclaw"
 WORKSPACE="$OPENCLAW_DIR/workspace"
 
@@ -82,7 +82,7 @@ done
 echo ""
 echo ">>> Copying workspace files..."
 
-WORKSPACE_SRC="$REPO_DIR/workspace"
+WORKSPACE_SRC="$SHARED_DIR/workspace"
 
 if [ ! -d "$WORKSPACE_SRC" ]; then
   skip "No workspace/ directory in repo — skipping file copy"
@@ -184,7 +184,7 @@ fi
 echo ""
 echo ">>> Checking custom skills..."
 
-CUSTOM_SKILLS_SRC="$REPO_DIR/skills"
+CUSTOM_SKILLS_SRC="$SHARED_DIR/skills"
 
 if [ -d "$CUSTOM_SKILLS_SRC" ]; then
   mkdir -p "$OPENCLAW_DIR/skills"
@@ -225,7 +225,7 @@ if [ "$SKIP_CRON" = false ]; then
     echo "  • workspace-activity-feed — 6-hourly (0 */6 * * *) — Discord activity posts"
     echo ""
     echo "  Create them by asking OpenClaw: 'Set up the recommended cron jobs'"
-    echo "  Or see: config/openclaw-workspace-manifest.md"
+    echo "  Or see: $WORKSPACE/bootstrap/README.md"
   fi
 fi
 

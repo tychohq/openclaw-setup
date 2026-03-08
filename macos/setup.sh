@@ -15,6 +15,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SHARED_DIR="$REPO_DIR/shared"
+CURRENT_STEP="starting"
+HANDOFF_PROMPT_FILE="$SHARED_DIR/scripts/handoff-prompt.md"
+
+set_step() {
+  CURRENT_STEP="$1"
+}
+
+on_error() {
+  local code=$?
+  echo ""
+  echo "❌ Setup stopped during: $CURRENT_STEP"
+  echo "   Last command: $BASH_COMMAND"
+  echo "   Fix the issue above, then run the same command again."
+  exit "$code"
+}
+
+trap on_error ERR
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
@@ -28,7 +45,7 @@ Options:
   --with-extensions   Include editor extensions in full setup
   --skip-extensions   Skip editor extensions (default)
   --config FILE       Use a custom config file (default: config.sh)
-  --handoff           Launch Claude Code after setup to finish interactively (default)
+  --handoff           Launch Claude Code after setup to finish interactively
   --no-handoff        Skip Claude Code handoff
   --help, -h          Show this help
 EOF
@@ -37,7 +54,7 @@ EOF
 DRY_RUN=false
 EXTENSIONS_ONLY=false
 SKIP_EXTENSIONS=true
-HANDOFF=true
+HANDOFF=false
 CONFIG_FILE="$SCRIPT_DIR/config.sh"
 
 while [ "$#" -gt 0 ]; do
@@ -70,6 +87,17 @@ fi
 
 # shellcheck source=config.sh
 source "$CONFIG_FILE"
+
+# ── Platform checks ──────────────────────────────────────────────────────────
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "This script only works on macOS." >&2
+  exit 1
+fi
+
+if [ "$(uname -m)" != "arm64" ]; then
+  echo "⚠️  This setup is tested on Apple Silicon Macs. Continuing on $(uname -m)."
+fi
 
 # ── Reporting helpers ────────────────────────────────────────────────────────
 
@@ -161,6 +189,25 @@ bun_global_version() {
   if [ -f "$pj" ]; then
     sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$pj" | head -n1
   fi
+  return 0
+}
+
+copy_template_if_missing() {
+  local src="$1"
+  local dest="$2"
+  local label="$3"
+
+  if [ -f "$dest" ]; then
+    return 1
+  fi
+
+  if [ ! -f "$src" ]; then
+    record_failed "$label" "template missing: $src"
+    return 1
+  fi
+
+  cp "$src" "$dest"
+  record_installed "$label (template created)"
   return 0
 }
 
@@ -301,7 +348,9 @@ install_editor_extensions() {
 if [ "$EXTENSIONS_ONLY" = true ]; then
   SKIP_EXTENSIONS=false
   install_editor_extensions
-  print_summary
+  if ! print_summary; then
+  exit 1
+fi
   exit $?
 fi
 
@@ -316,6 +365,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── 1. Xcode CLT ─────────────────────────────────────────────────────────────
+set_step "checking Apple Command Line Tools"
 
 if xcode-select -p &>/dev/null; then
   record_skipped "Xcode CLT" "already installed"
@@ -334,6 +384,7 @@ else
 fi
 
 # ── 2. Homebrew ───────────────────────────────────────────────────────────────
+set_step "installing Homebrew"
 
 if command -v brew &>/dev/null; then
   record_skipped "Homebrew" "already installed"
@@ -368,6 +419,7 @@ if ! command -v brew &>/dev/null; then
 fi
 
 # ── 3. Taps ───────────────────────────────────────────────────────────────────
+set_step "installing Homebrew taps"
 
 echo ">>> Homebrew taps..."
 for tap in "${TAPS[@]-}"; do
@@ -380,6 +432,7 @@ for tap in "${TAPS[@]-}"; do
 done
 
 # ── 4. Formulae ───────────────────────────────────────────────────────────────
+set_step "installing Homebrew formulae"
 
 echo ">>> Homebrew formulae..."
 for formula in "${FORMULAE[@]-}"; do
@@ -392,6 +445,7 @@ for formula in "${FORMULAE[@]-}"; do
 done
 
 # ── 5. Casks ──────────────────────────────────────────────────────────────────
+set_step "installing Mac apps"
 
 echo ">>> Homebrew casks..."
 for cask in "${CASKS[@]-}"; do
@@ -424,6 +478,7 @@ elif command -v code &>/dev/null; then
 fi
 
 # ── 6. Bun ────────────────────────────────────────────────────────────────────
+set_step "installing Bun"
 
 if command -v bun &>/dev/null; then
   record_skipped "Bun" "already installed"
@@ -439,6 +494,7 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # ── 7. Bun global packages ───────────────────────────────────────────────────
+set_step "installing Bun packages"
 
 echo ">>> Bun global packages..."
 for spec in "${BUN_GLOBALS[@]-}"; do
@@ -454,6 +510,7 @@ for spec in "${BUN_GLOBALS[@]-}"; do
 done
 
 # ── 8. Node via fnm ──────────────────────────────────────────────────────────
+set_step "installing Node.js"
 
 echo ">>> Node.js via fnm..."
 if command -v fnm &>/dev/null; then
@@ -516,6 +573,7 @@ else
 fi
 
 # ── 9. Rust (optional) ───────────────────────────────────────────────────────
+set_step "installing Rust"
 
 if [ "${INSTALL_RUST:-false}" = true ]; then
   if command -v rustup &>/dev/null; then
@@ -532,6 +590,7 @@ if [ "${INSTALL_RUST:-false}" = true ]; then
 fi
 
 # ── 10. Git config ───────────────────────────────────────────────────────────
+set_step "configuring git"
 
 echo ""
 echo ">>> Git configuration..."
@@ -582,6 +641,7 @@ else
 fi
 
 # ── 11. Shell setup (optional) ───────────────────────────────────────────────
+set_step "configuring shell"
 
 if [ "${INSTALL_PREZTO:-false}" = true ]; then
   if [ -d "$HOME/.zprezto" ]; then
@@ -600,6 +660,7 @@ if [ "${INSTALL_POWERLEVEL10K:-false}" = true ]; then
 fi
 
 # ── 12. OpenClaw (optional) ──────────────────────────────────────────────────
+set_step "installing OpenClaw"
 
 if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   echo ">>> Installing OpenClaw..."
@@ -632,40 +693,49 @@ if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   OC_CONFIG="${OPENCLAW_SECRETS_JSON:-$REPO_DIR/openclaw-secrets.json}"
   OC_ENV="${OPENCLAW_SECRETS_ENV:-$REPO_DIR/openclaw-secrets.env}"
   OC_AUTH="${OPENCLAW_SECRETS_AUTH:-$REPO_DIR/openclaw-auth-profiles.json}"
+  OPENCLAW_TEMPLATES_CREATED=false
 
-  # Auto-create .env from template if it doesn't exist yet
-  if [ ! -f "$OC_ENV" ] && [ -f "$SHARED_DIR/config/openclaw-env.template" ]; then
-    echo ">>> Creating openclaw-secrets.env from template..."
-    cp "$SHARED_DIR/config/openclaw-env.template" "$OC_ENV"
-    record_installed "openclaw-secrets.env (from template — fill in your API keys)"
-    echo "  ℹ️  Edit $OC_ENV with your API keys, then re-run setup or run:"
-    echo "     scripts/setup-openclaw.sh --env $OC_ENV"
+  if copy_template_if_missing "$SHARED_DIR/config/openclaw-config.template.json" "$OC_CONFIG" "openclaw-secrets.json"; then
+    OPENCLAW_TEMPLATES_CREATED=true
+  fi
+  if copy_template_if_missing "$SHARED_DIR/config/openclaw-env.template" "$OC_ENV" "openclaw-secrets.env"; then
+    OPENCLAW_TEMPLATES_CREATED=true
+  fi
+  if copy_template_if_missing "$SHARED_DIR/config/openclaw-auth-profiles.template.json" "$OC_AUTH" "openclaw-auth-profiles.json"; then
+    OPENCLAW_TEMPLATES_CREATED=true
   fi
 
-  if [ -f "$OC_CONFIG" ]; then
+  if [ "$OPENCLAW_TEMPLATES_CREATED" = true ]; then
+    echo "  ℹ️  OpenClaw template files were created in: $REPO_DIR"
+    echo "     Fill in your real keys and IDs, then rerun this script or run:"
+    echo "     cd $REPO_DIR"
+    echo "     bash shared/scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json"
+    record_skipped "OpenClaw config" "template files created — fill in secrets first"
+  elif [ -f "$OC_CONFIG" ]; then
     echo ">>> Configuring OpenClaw from secrets file..."
     SETUP_ARGS=(--config "$OC_CONFIG")
     [ -f "$OC_ENV" ] && SETUP_ARGS+=(--env "$OC_ENV")
     [ -f "$OC_AUTH" ] && SETUP_ARGS+=(--auth-profiles "$OC_AUTH")
-    if "$SHARED_DIR/scripts/setup-openclaw.sh" "${SETUP_ARGS[@]}"; then
+    if bash "$SHARED_DIR/scripts/setup-openclaw.sh" "${SETUP_ARGS[@]}"; then
       record_installed "OpenClaw config"
     else
       record_failed "OpenClaw config" "setup-openclaw.sh failed"
     fi
   else
     echo "  ⏭️  No openclaw-secrets.json found — skipping config."
-    echo "     Run: scripts/setup-openclaw.sh --config <your-secrets.json>"
+    echo "     Run: bash shared/scripts/setup-openclaw.sh --config <your-secrets.json>"
     record_skipped "OpenClaw config" "no secrets file (see config/ templates)"
   fi
 
   # Bootstrap workspace, skills, and cron
   if [ -x "$SHARED_DIR/scripts/bootstrap-openclaw-workspace.sh" ]; then
     echo ">>> Bootstrapping OpenClaw workspace..."
-    "$SHARED_DIR/scripts/bootstrap-openclaw-workspace.sh" || record_failed "OpenClaw workspace" "bootstrap failed"
+    bash "$SHARED_DIR/scripts/bootstrap-openclaw-workspace.sh" || record_failed "OpenClaw workspace" "bootstrap failed"
   fi
 fi
 
 # ── 13. macOS Defaults ───────────────────────────────────────────────────────
+set_step "applying macOS defaults"
 
 echo ">>> Applying macOS defaults..."
 
@@ -733,6 +803,7 @@ if [ "${APPLY_RAYCAST_HOTKEY:-true}" = true ]; then
 fi
 
 # ── 14. Create directories ───────────────────────────────────────────────────
+set_step "creating directories"
 
 echo ">>> Creating directories..."
 for dir in "${DIRS[@]-}"; do
@@ -745,10 +816,12 @@ for dir in "${DIRS[@]-}"; do
 done
 
 # ── 15. Editor extensions ────────────────────────────────────────────────────
+set_step "installing editor extensions"
 
 install_editor_extensions
 
 # ── 16. Post scripts ─────────────────────────────────────────────────────────
+set_step "running post-install scripts"
 
 for script in "${POST_SCRIPTS[@]-}"; do
   [ -z "$script" ] && continue
@@ -805,12 +878,14 @@ echo "  3. Configure SSH: add keys to ~/.ssh/"
 if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   if [ ! -f "${OC_CONFIG:-}" ]; then
     echo "  4. Set up OpenClaw:"
-    echo "     cp config/openclaw-config.template.json openclaw-secrets.json"
-    echo "     cp config/openclaw-env.template openclaw-secrets.env"
+    echo "     cd $REPO_DIR"
+    echo "     cp shared/config/openclaw-config.template.json openclaw-secrets.json"
+    echo "     cp shared/config/openclaw-env.template openclaw-secrets.env"
+    echo "     cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json"
     echo "     # Fill in your API keys, then:"
-    echo "     scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env"
+    echo "     bash shared/scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json"
   else
-    echo "  4. Verify OpenClaw: scripts/setup-openclaw.sh --check"
+    echo "  4. Verify OpenClaw: cd $REPO_DIR && bash shared/scripts/setup-openclaw.sh --check"
   fi
 fi
 echo ""
@@ -818,6 +893,7 @@ echo ""
 # ── Handoff to Claude Code ───────────────────────────────────────────────────
 
 if [ "$HANDOFF" = true ]; then
+  set_step "starting Claude Code handoff"
   # Install Claude Code if not already present
   if ! command -v claude &>/dev/null; then
     echo ">>> Installing Claude Code for handoff..."
@@ -827,11 +903,16 @@ if [ "$HANDOFF" = true ]; then
     else
       echo "⚠️  Claude Code installation failed. Install manually:"
       echo "    curl -fsSL https://claude.ai/install.sh | bash"
-      echo "    claude --dangerously-skip-permissions --prompt \"\$(cat $SCRIPT_DIR/scripts/handoff-prompt.md)\""
+      echo "    claude --dangerously-skip-permissions --prompt \"\$(cat $HANDOFF_PROMPT_FILE)\""
     fi
   fi
 
   if command -v claude &>/dev/null; then
+    if [ ! -f "$HANDOFF_PROMPT_FILE" ]; then
+      record_failed "Claude Code handoff" "missing handoff prompt: $HANDOFF_PROMPT_FILE"
+      exit 1
+    fi
+
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "  Handing off to Claude Code to finish setup..."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -840,7 +921,7 @@ if [ "$HANDOFF" = true ]; then
     # Write handoff context to a file Claude Code can read
     HANDOFF_FILE="$SCRIPT_DIR/.handoff-context.md"
     cat > "$HANDOFF_FILE" << HANDOFF_EOF
-$(cat "$SCRIPT_DIR/scripts/handoff-prompt.md")
+$(cat "$HANDOFF_PROMPT_FILE")
 
 ## What was installed
 $(printf '%s\n' "${INSTALLED_ITEMS[@]-}" | sed 's/^/- /')

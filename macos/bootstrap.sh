@@ -9,6 +9,45 @@ set -euo pipefail
 
 REPO_URL="https://github.com/tychohq/openclaw-setup.git"
 CLONE_DIR="$HOME/projects/openclaw-setup"
+CURRENT_STEP="starting"
+SUDO_KEEPALIVE_PID=""
+
+step() {
+  CURRENT_STEP="$1"
+  echo ""
+  echo ">>> $1"
+}
+
+ok() {
+  echo "  ✅ $1"
+}
+
+warn() {
+  echo "  ⚠️  $1"
+}
+
+fail() {
+  echo "❌ $1" >&2
+}
+
+cleanup() {
+  if [ -n "$SUDO_KEEPALIVE_PID" ] && kill -0 "$SUDO_KEEPALIVE_PID" 2>/dev/null; then
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+  fi
+  sudo -k 2>/dev/null || true
+}
+
+on_error() {
+  local code=$?
+  echo ""
+  fail "Setup stopped during: $CURRENT_STEP"
+  echo "   The last command returned exit code $code."
+  echo "   Fix the issue above, then run the same command again."
+  exit "$code"
+}
+
+trap cleanup EXIT
+trap on_error ERR
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
@@ -16,64 +55,81 @@ echo "║       Mac Mini Setup — Bootstrap             ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
-# ── Step 0: Get sudo upfront ──────────────────────────────────────────────────
-# When piped via curl|bash, stdin isn't a terminal so sudo can't prompt.
-# We read the password from /dev/tty and enable passwordless sudo for the
-# duration of setup, then remove it at the end.
-SUDOERS_TMP="/etc/sudoers.d/openclaw-setup-temp"
-cleanup_sudo() {
-  sudo rm -f "$SUDOERS_TMP" 2>/dev/null || true
-}
-trap cleanup_sudo EXIT
+step "Checking that this is a Mac"
+if [ "$(uname -s)" != "Darwin" ]; then
+  fail "This bootstrap script only works on macOS."
+  exit 1
+fi
+ok "macOS detected"
 
-if ! sudo -n true 2>/dev/null; then
-  echo ">>> This setup needs admin access. Enter your password (once):"
-  sudo -v -S < /dev/tty
-  if [ $? -ne 0 ]; then
-    echo "❌ sudo authentication failed. Make sure this user has admin access."
-    exit 1
-  fi
+if [ "$(uname -m)" = "arm64" ]; then
+  ok "Apple Silicon detected"
+else
+  warn "This flow is tested on Apple Silicon Macs. Continuing on $(uname -m)."
 fi
 
-# Grant passwordless sudo for this user during setup
-echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee "$SUDOERS_TMP" > /dev/null
-sudo chmod 0440 "$SUDOERS_TMP"
-echo "  ✅ Sudo configured (no more password prompts during setup)"
+step "Checking admin access"
+if [ ! -r /dev/tty ]; then
+  fail "This script needs a Terminal window so it can ask for your password."
+  exit 1
+fi
 
-# ── Step 1: Xcode Command Line Tools ──────────────────────────────────────────
+if sudo -n true 2>/dev/null; then
+  ok "Admin access already available"
+else
+  echo "  This setup needs your Mac password to install tools."
+  if ! sudo -v < /dev/tty; then
+    fail "Admin authentication failed. Make sure this user has admin access."
+    exit 1
+  fi
+  ok "Password accepted"
+fi
+
+while true; do
+  sudo -n true 2>/dev/null || exit
+  sleep 60
+done &
+SUDO_KEEPALIVE_PID=$!
+
+step "Checking Apple Command Line Tools"
 if ! xcode-select -p &>/dev/null; then
-  echo ">>> Installing Xcode Command Line Tools (required for git, compilers, etc.)..."
-  echo "    A system dialog will appear. Click 'Install' and wait for it to finish."
-  xcode-select --install
+  echo "  These tools are required for git, Homebrew, and compilers."
+  echo "  A macOS pop-up may appear. Click Install, then come back here."
+  xcode-select --install 2>/dev/null || true
 
-  # Wait for it to actually finish
-  echo "    Waiting for Xcode CLT installation to complete..."
+  echo "  Waiting for Apple Command Line Tools to finish installing..."
   until xcode-select -p &>/dev/null; do
     sleep 5
   done
-  echo "    ✅ Xcode CLT installed"
+  ok "Apple Command Line Tools installed"
 else
-  echo "✅ Xcode CLT already installed"
+  ok "Apple Command Line Tools already installed"
 fi
 
-# ── Step 2: Clone the repo ────────────────────────────────────────────────────
+step "Preparing the setup repo"
 mkdir -p "$(dirname "$CLONE_DIR")"
 
-if [ -d "$CLONE_DIR/.git" ]; then
-  echo ">>> Repo already cloned at $CLONE_DIR — updating..."
-  git -C "$CLONE_DIR" fetch origin
-  if ! git -C "$CLONE_DIR" pull --ff-only 2>/dev/null; then
-    echo "  ⚠️  Local changes detected — skipping auto-update."
-    echo "     Manually pull or reset if you want the latest version."
-  fi
-else
-  echo ">>> Cloning setup repo..."
-  git clone "$REPO_URL" "$CLONE_DIR"
+if [ -e "$CLONE_DIR" ] && [ ! -d "$CLONE_DIR/.git" ]; then
+  fail "$CLONE_DIR already exists, but it is not a git repo. Move or rename it, then rerun."
+  exit 1
 fi
 
-# ── Step 3: Run the setup script ──────────────────────────────────────────────
-echo ""
-echo ">>> Running setup script..."
-echo ""
+if [ -d "$CLONE_DIR/.git" ]; then
+  echo "  Found an existing repo at $CLONE_DIR."
+  if git -C "$CLONE_DIR" fetch origin && git -C "$CLONE_DIR" pull --ff-only; then
+    ok "Repo updated"
+  else
+    warn "Local changes detected — leaving the repo as-is."
+    echo "     If you want the newest version, commit/stash your changes and rerun."
+  fi
+else
+  echo "  Downloading the setup repo to $CLONE_DIR ..."
+  git clone "$REPO_URL" "$CLONE_DIR"
+  ok "Repo cloned"
+fi
+
+step "Starting the full Mac mini setup"
+echo "  Next you will see Homebrew, app, and tool installation steps."
+echo "  This can take a while on a fresh Mac."
 chmod +x "$CLONE_DIR/macos/setup.sh"
-"$CLONE_DIR/macos/setup.sh" "$@"
+bash "$CLONE_DIR/macos/setup.sh" "$@"

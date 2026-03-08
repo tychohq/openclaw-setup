@@ -6,9 +6,9 @@
 # Idempotent — safe to re-run.
 #
 # Usage:
-#   ./scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json
-#   ./scripts/setup-openclaw.sh --config openclaw-secrets.json  # env vars inline in config
-#   ./scripts/setup-openclaw.sh --check                         # verify existing install
+#   bash shared/scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json
+#   bash shared/scripts/setup-openclaw.sh --config openclaw-secrets.json  # env vars inline in config
+#   bash shared/scripts/setup-openclaw.sh --check                         # verify existing install
 #
 # The secrets files are YOUR filled-in copies of the templates in config/.
 # They should NOT be committed to git (they're in .gitignore).
@@ -18,6 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 OPENCLAW_DIR="$HOME/.openclaw"
+CURRENT_STEP="starting"
 
 CONFIG_FILE=""
 ENV_FILE=""
@@ -49,6 +50,43 @@ NC='\033[0m'
 ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
 warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
 fail() { echo -e "  ${RED}❌ $1${NC}"; }
+
+set_step() {
+  CURRENT_STEP="$1"
+}
+
+on_error() {
+  local code=$?
+  echo ""
+  fail "Setup stopped during: $CURRENT_STEP"
+  echo "   Last command: $BASH_COMMAND"
+  echo "   Fix the issue above, then run the command again."
+  exit "$code"
+}
+
+trap on_error ERR
+
+validate_json() {
+  local file="$1"
+
+  if command -v jq &>/dev/null; then
+    jq empty "$file" >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v python3 &>/dev/null; then
+    python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$file" >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v python &>/dev/null; then
+    python -c 'import json, sys; json.load(open(sys.argv[1]))' "$file" >/dev/null 2>&1
+    return $?
+  fi
+
+  warn "Skipping JSON validation because neither jq nor python is installed"
+  return 0
+}
 
 # ── Check mode ────────────────────────────────────────────────────────────────
 if [ "$CHECK_ONLY" = true ]; then
@@ -124,10 +162,11 @@ if [ -z "$CONFIG_FILE" ]; then
   echo "Error: --config is required (your filled-in openclaw-secrets.json)"
   echo ""
   echo "Quick start:"
-  echo "  1. cp config/openclaw-config.template.json openclaw-secrets.json"
-  echo "  2. cp config/openclaw-env.template openclaw-secrets.env"
-  echo "  3. Fill in your API keys and tokens"
-  echo "  4. $0 --config openclaw-secrets.json --env openclaw-secrets.env"
+  echo "  1. cp shared/config/openclaw-config.template.json openclaw-secrets.json"
+  echo "  2. cp shared/config/openclaw-env.template openclaw-secrets.env"
+  echo "  3. cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json"
+  echo "  4. Fill in your API keys and tokens"
+  echo "  5. $0 --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json"
   exit 1
 fi
 
@@ -147,13 +186,13 @@ if [ -n "$AUTH_PROFILES_FILE" ] && [ ! -f "$AUTH_PROFILES_FILE" ]; then
 fi
 
 # Validate JSON
-if ! python3 -c "import json; json.load(open('$CONFIG_FILE'))" 2>/dev/null; then
+if ! validate_json "$CONFIG_FILE"; then
   fail "Invalid JSON in $CONFIG_FILE"
   exit 1
 fi
 
 if [ -n "$AUTH_PROFILES_FILE" ]; then
-  if ! python3 -c "import json; json.load(open('$AUTH_PROFILES_FILE'))" 2>/dev/null; then
+  if ! validate_json "$AUTH_PROFILES_FILE"; then
     fail "Invalid JSON in $AUTH_PROFILES_FILE"
     exit 1
   fi
@@ -175,10 +214,12 @@ fi
 echo ">>> Setting up OpenClaw..."
 
 # 1. Create directory
+set_step "creating ~/.openclaw"
 mkdir -p "$OPENCLAW_DIR"
 ok "Directory: $OPENCLAW_DIR"
 
 # 2. Place config file
+set_step "installing OpenClaw config"
 if [ -f "$OPENCLAW_DIR/openclaw.json" ]; then
   # Merge: keep existing config, overlay with new values
   if command -v jq &>/dev/null; then
@@ -221,6 +262,7 @@ if command -v jq &>/dev/null && [ -f "$OPENCLAW_DIR/openclaw.json" ]; then
 fi
 
 # 3. Place env file
+set_step "installing environment variables"
 if [ -n "$ENV_FILE" ]; then
   if [ -f "$OPENCLAW_DIR/.env" ]; then
     # Merge: add new vars, don't overwrite existing non-empty values
@@ -255,6 +297,7 @@ if [ -n "$ENV_FILE" ]; then
 fi
 
 # 3b. Place auth profiles
+set_step "installing auth profiles"
 if [ -n "$AUTH_PROFILES_FILE" ]; then
   AUTH_PROFILES_DIR="$OPENCLAW_DIR/agents/main/agent"
   mkdir -p "$AUTH_PROFILES_DIR"
@@ -285,6 +328,7 @@ if [ -n "$AUTH_PROFILES_FILE" ]; then
 fi
 
 # 4. Generate gateway token if not set
+set_step "generating gateway token"
 if [ -f "$OPENCLAW_DIR/.env" ]; then
   if ! grep -q "^OPENCLAW_GATEWAY_TOKEN=.\+" "$OPENCLAW_DIR/.env" 2>/dev/null; then
     TOKEN=$(openssl rand -hex 24)
@@ -304,17 +348,25 @@ if [ -f "$OPENCLAW_DIR/.env" ]; then
 fi
 
 # 5. Install and start the daemon
+set_step "installing or restarting the OpenClaw service"
 echo ">>> Installing OpenClaw daemon..."
 if command -v openclaw &>/dev/null; then
   if openclaw gateway status &>/dev/null 2>&1; then
     warn "Gateway already running — restarting to pick up new config..."
-    openclaw gateway restart 2>&1 || true
-    ok "Gateway restarted"
+    if openclaw gateway restart; then
+      ok "Gateway restarted"
+    else
+      fail "Gateway restart failed"
+      exit 1
+    fi
   else
     # Install launchd service
-    openclaw gateway install 2>&1 || true
-    openclaw gateway start 2>&1 || true
-    ok "Gateway installed and started"
+    if openclaw gateway install && openclaw gateway start; then
+      ok "Gateway installed and started"
+    else
+      fail "Gateway install/start failed"
+      exit 1
+    fi
   fi
 else
   fail "openclaw CLI not found — install it first (bun install -g openclaw)"
@@ -322,6 +374,7 @@ else
 fi
 
 # 6. Create workspace directory
+set_step "creating workspace"
 WORKSPACE="$OPENCLAW_DIR/workspace"
 mkdir -p "$WORKSPACE"
 ok "Workspace: $WORKSPACE"
