@@ -438,6 +438,10 @@ preflight() {
   fi
 
   warn_if_auto_update_enabled
+
+  # Validate the resolved service label is actually reachable before we
+  # attempt any update. This catches bad labels during dry-run, not just prod.
+  validate_service_reachable || return 1
 }
 
 copy_if_present() {
@@ -585,6 +589,24 @@ perform_version_rollback() {
   fi
   warn "Insufficient metadata to perform version rollback"
   return 1
+}
+
+validate_service_reachable() {
+  # Verify the service we'd restart actually exists in the service manager.
+  # Called during preflight so dry-run catches bad labels before apply would.
+  if [[ "$PLATFORM" == "macos" ]]; then
+    if ! launchctl print "gui/$(id -u)/$SERVICE_LABEL" >/dev/null 2>&1; then
+      fail "Service 'gui/$(id -u)/$SERVICE_LABEL' not found in launchd. Restart would fail."
+      return 1
+    fi
+    log "Service validated: gui/$(id -u)/$SERVICE_LABEL (launchd)"
+  else
+    if ! systemctl --user cat "$SERVICE_UNIT" >/dev/null 2>&1; then
+      fail "Service '$SERVICE_UNIT' not found in systemd. Restart would fail."
+      return 1
+    fi
+    log "Service validated: $SERVICE_UNIT (systemd)"
+  fi
 }
 
 restart_gateway() {
