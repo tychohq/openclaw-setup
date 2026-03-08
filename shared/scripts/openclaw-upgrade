@@ -392,14 +392,32 @@ preflight() {
   GATEWAY_STATUS_BEFORE_JSON="$(run_capture_stdout openclaw gateway status --json)" || { fail "openclaw gateway status --json failed"; return 1; }
   printf '%s' "$GATEWAY_STATUS_BEFORE_JSON" | jq -e '.service.loaded == true' >/dev/null 2>&1 || { fail "Gateway service is not installed/loaded"; return 1; }
   SERVICE_LABEL="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.label')"
+
+  # Validate the reported label — openclaw gateway status --json can return
+  # generic values like "LaunchAgent" or "systemd" instead of the real service
+  # identifier. Fall back to well-known defaults when the label is missing or
+  # doesn't look like a real service name (must contain a dot for launchd, or
+  # end with .service for systemd).
   if [[ "$PLATFORM" == "linux" ]]; then
-    if [[ -n "$SERVICE_LABEL" ]]; then
+    if [[ -n "$SERVICE_LABEL" && "$SERVICE_LABEL" == *"."* ]]; then
       [[ "$SERVICE_LABEL" == *.service ]] && SERVICE_UNIT="$SERVICE_LABEL" || SERVICE_UNIT="$SERVICE_LABEL.service"
     else
+      [[ -n "$SERVICE_LABEL" && "$SERVICE_LABEL" != "systemd" ]] && warn "Ignoring suspicious service label from gateway status: '$SERVICE_LABEL'"
       SERVICE_UNIT="openclaw-gateway.service"
+      SERVICE_LABEL="openclaw-gateway"
     fi
   else
-    SERVICE_LABEL="${SERVICE_LABEL:-ai.openclaw.gateway}"
+    if [[ -z "$SERVICE_LABEL" || "$SERVICE_LABEL" == "LaunchAgent" || ! "$SERVICE_LABEL" == *"."* ]]; then
+      [[ -n "$SERVICE_LABEL" && "$SERVICE_LABEL" != "ai.openclaw.gateway" ]] && warn "Ignoring suspicious service label from gateway status: '$SERVICE_LABEL'"
+      # Try to read the real label directly from the plist as ground truth
+      local plist_path
+      plist_path="$(json_get "$GATEWAY_STATUS_BEFORE_JSON" '.service.command.sourcePath')"
+      plist_path="${plist_path:-$HOME/Library/LaunchAgents/ai.openclaw.gateway.plist}"
+      if [[ -f "$plist_path" ]]; then
+        SERVICE_LABEL="$(/usr/libexec/PlistBuddy -c "Print :Label" "$plist_path" 2>/dev/null || true)"
+      fi
+      SERVICE_LABEL="${SERVICE_LABEL:-ai.openclaw.gateway}"
+    fi
   fi
 
   UPDATE_STATUS_BEFORE_JSON="$(run_capture_stdout openclaw update status --json)" || { fail "openclaw update status --json failed"; return 1; }
