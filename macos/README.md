@@ -367,14 +367,6 @@ bash shared/scripts/setup-openclaw.sh --check
 
 Then read the last `❌` message and rerun the main setup command after fixing it.
 
-## Advanced: Slack bot creation
-
-If you want a Slack bot for OpenClaw, run:
-
-```bash
-bash macos/scripts/create-slack-bot.sh <your-config-token> --manifest shared/slack-app-manifest.json
-```
-
 ## License
 
 MIT
