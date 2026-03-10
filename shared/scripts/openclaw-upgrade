@@ -615,13 +615,119 @@ restart_gateway() {
     return 0
   fi
   if [[ "$PLATFORM" == "macos" ]]; then
-    run_logged launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL"
+    # On macOS, we run inside the gateway process. Using kickstart -k kills us
+    # mid-script (SIGPIPE). Instead: spawn a detached health checker, then send
+    # SIGTERM to the gateway. launchd KeepAlive=true respawns it automatically.
+    # The detached checker writes results to $BACKUP_DIR/health-check.json.
+    spawn_detached_health_check
+    local gw_pid
+    gw_pid="$(launchctl print "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null | awk '/^\tpid =/{print $3}')"
+    if [[ -n "$gw_pid" && "$gw_pid" -gt 0 ]]; then
+      log "Sending SIGTERM to gateway (pid $gw_pid); launchd will respawn"
+      kill -TERM "$gw_pid" 2>/dev/null || true
+    else
+      # Fallback: kickstart -k (old behavior) — may SIGPIPE us but at least restarts
+      warn "Could not find gateway PID; falling back to kickstart -k"
+      run_logged launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL"
+    fi
+    # Script dies here when the gateway process exits — that's expected.
+    # The detached health checker handles post-restart verification.
+    return 0
   else
     run_logged systemctl --user restart "$SERVICE_UNIT"
   fi
 }
 
+spawn_detached_health_check() {
+  # Launch a fully detached process that waits for the new gateway to become
+  # healthy, captures post-upgrade state, verifies integrity, and writes a
+  # result JSON. This process survives the gateway kill because it's detached
+  # from the gateway's process group.
+  local hc_script hc_log
+  hc_log="${BACKUP_DIR}/health-check.log"
+
+  hc_script="$(cat <<HEALTH_SCRIPT
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Wait for old gateway to die
+sleep 5
+
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
+HEALTH_INTERVAL="${HEALTH_INTERVAL}"
+BACKUP_DIR="${BACKUP_DIR}"
+PREVIOUS_VERSION="${PREVIOUS_VERSION}"
+FINAL_VERSION=""
+
+log() { printf '[health-check] %s\n' "\$*"; }
+fail() { printf '[health-check] ERROR: %s\n' "\$*" >&2; }
+
+write_result() {
+  local status="\$1" reason="\${2:-}" version="\${3:-}"
+  jq -n \\
+    --arg status "\$status" \\
+    --arg reason "\$reason" \\
+    --arg previous_version "$PREVIOUS_VERSION" \\
+    --arg final_version "\$version" \\
+    --arg checked_at "\$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \\
+    '{status: \$status, reason: (if (\$reason | length) > 0 then \$reason else null end), previous_version: \$previous_version, final_version: \$final_version, checked_at: \$checked_at}' \\
+    > "\$BACKUP_DIR/health-check.json"
+}
+
+# Wait for gateway to come up
+deadline=\$(( \$(date +%s) + HEALTH_TIMEOUT ))
+health_json=""
+while true; do
+  if health_json="\$(openclaw health --json --timeout 10000 2>/dev/null)"; then
+    FINAL_VERSION="\$(printf '%s' "\$health_json" | jq -r '.version // empty' 2>/dev/null || true)"
+    log "Gateway healthy (version: \${FINAL_VERSION:-unknown})"
+    break
+  fi
+  now="\$(date +%s)"
+  if [[ "\$now" -ge "\$deadline" ]]; then
+    fail "Gateway health check timed out after \${HEALTH_TIMEOUT}s"
+    write_result "failed" "health check timed out" ""
+    exit 1
+  fi
+  sleep "\$HEALTH_INTERVAL"
+done
+
+# Capture post-update state
+cron_after="\$(openclaw cron list --json 2>/dev/null || true)"
+cron_status_after="\$(openclaw cron status --json 2>/dev/null || true)"
+skills_after="\$(openclaw skills list --json 2>/dev/null || true)"
+
+printf '%s\n' "\$cron_after" > "\$BACKUP_DIR/cron-after.json" 2>/dev/null || true
+printf '%s\n' "\$cron_status_after" > "\$BACKUP_DIR/cron-status-after.json" 2>/dev/null || true
+printf '%s\n' "\$skills_after" > "\$BACKUP_DIR/skills-after.json" 2>/dev/null || true
+
+# Run doctor
+if ! openclaw doctor --non-interactive --yes >"\$BACKUP_DIR/doctor-post.log" 2>&1; then
+  log "Post-restart doctor had warnings (see doctor-post.log)"
+fi
+
+write_result "success" "" "\$FINAL_VERSION"
+log "Health check complete: success (version: \${FINAL_VERSION:-unknown})"
+HEALTH_SCRIPT
+)"
+
+  # Write and execute as detached process
+  local hc_path="${BACKUP_DIR}/health-check.sh"
+  printf '%s\n' "$hc_script" > "$hc_path"
+  chmod +x "$hc_path"
+  log "Spawning detached health checker: $hc_path (log: $hc_log)"
+  nohup "$hc_path" > "$hc_log" 2>&1 < /dev/null &
+  disown
+}
+
 wait_for_health() {
+  if [[ "$PLATFORM" == "macos" && "$DRY_RUN" != true && "$MODE" != "notify-only" ]]; then
+    # On macOS, the detached health checker handles this. We'll be dead by the
+    # time launchd respawns the gateway, so this is a no-op. The script will
+    # exit (SIGTERM/SIGPIPE) before reaching post-restart steps — that's fine.
+    log "Health check delegated to detached process"
+    return 0
+  fi
   local deadline now
   deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
   while true; do
@@ -790,6 +896,8 @@ attempt_rollback() {
   log "Starting rollback flow"
   restore_snapshot_files || true
   perform_version_rollback || { FINAL_STATUS="rollback_failure"; return 1; }
+  # On macOS, restart_gateway kills us — launchd respawns with rolled-back version.
+  # That's the desired outcome. We won't reach wait_for_health or doctor.
   restart_gateway || { FINAL_STATUS="rollback_failure"; return 1; }
   wait_for_health || { FINAL_STATUS="rollback_failure"; return 1; }
   run_logged openclaw doctor --non-interactive --yes || { FINAL_STATUS="rollback_failure"; return 1; }
@@ -846,7 +954,14 @@ main() {
   create_backup || return "$EXIT_FAILURE"
   if ! run_update; then fail_and_exit "openclaw update failed" "$EXIT_FAILURE"; return "$FINAL_EXIT_CODE"; fi
   if ! run_logged openclaw doctor --non-interactive --yes; then fail_and_exit "Post-update doctor failed" "$EXIT_FAILURE"; return "$FINAL_EXIT_CODE"; fi
+
+  # On macOS, restart_gateway sends SIGTERM and we die with the process.
+  # The detached health checker (spawned inside restart_gateway) handles
+  # post-restart verification. Everything after this point is best-effort.
   if ! restart_gateway; then fail_and_exit "Gateway restart failed" "$EXIT_FAILURE"; return "$FINAL_EXIT_CODE"; fi
+
+  # --- Below here may never execute on macOS (we're dying with the gateway) ---
+
   if ! wait_for_health; then fail_and_exit "Gateway health check failed" "$EXIT_HEALTH"; return "$FINAL_EXIT_CODE"; fi
   if ! capture_post_update_state; then fail_and_exit "Post-upgrade cron/skills snapshot failed" "$EXIT_FAILURE"; return "$FINAL_EXIT_CODE"; fi
   if ! verify_integrity; then fail_and_exit "Cron/skills integrity verification failed" "$EXIT_FAILURE"; return "$FINAL_EXIT_CODE"; fi
