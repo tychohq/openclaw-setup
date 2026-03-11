@@ -42,6 +42,11 @@ workspace/
 └── *.md        — root files (AGENTS, SOUL, IDENTITY, USER, TOOLS, HEARTBEAT, MEMORY)
 ```
 
+## Authentication: Use Device Auth Flows
+**Never ask the user to run a CLI login command or paste credentials.** When a tool needs authentication (AWS, Google, GitHub, etc.), run the command yourself with `--no-browser` or equivalent, extract the URL + code, and send them to the user in chat. They open the link on any device, complete auth, and the CLI picks it up automatically.
+
+See `docs/aws.md` for the full pattern and examples (AWS SSO, SSM, Google, GitHub, Codex).
+
 ## External vs Internal
 **Do freely:** Read files, explore, organize, search the web, check calendars, work within workspace.
 **Ask first:** Sending emails, public posts, anything that leaves the machine.

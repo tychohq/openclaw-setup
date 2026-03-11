@@ -136,6 +136,18 @@ $L comments create TYC-30 --body "Update"       # add comment
 
 **Full reference:** `~/.openclaw/workspace/tools/linear.md`
 
+## Authentication: Device Auth Flows
+**Never ask the user to log in from a CLI prompt or paste credentials.** When any tool needs auth, run the command with `--no-browser` or equivalent, extract the URL + code, and send them to the user.
+
+| Tool | Command | Notes |
+|---|---|---|
+| AWS SSO | `aws sso login --profile <p> --no-browser --use-device-code` | Send URL + code; pre-fill link if SSO portal supports `/start/#/device/CODE` |
+| Google (gog) | `gog auth add <email> --remote` | Outputs OAuth URL |
+| GitHub | `gh auth login` | Outputs device code |
+| Codex | `codex login --device-auth` | ChatGPT-backed auth |
+
+Full reference for deployed instances: `shared/workspace/docs/aws.md`
+
 ## Rules
 - Shell scripts: `set -e`, bash, no exotic deps
 - Never write secrets to tracked files — use `.env` (gitignored) or `openclaw secrets`
