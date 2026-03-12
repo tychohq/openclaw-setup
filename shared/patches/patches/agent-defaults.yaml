@@ -31,3 +31,7 @@ steps:
   - type: config_set
     path: agents.defaults.contextPruning
     value: '{"mode":"off","ttl":"1h"}'
+
+  - type: config_set
+    path: agents.defaults.timeoutSeconds
+    value: "1800"
