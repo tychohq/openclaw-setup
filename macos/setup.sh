@@ -10,6 +10,9 @@ set -euo pipefail
 #   ./setup.sh --with-extensions  # Full setup + editor extensions
 #   ./setup.sh --extensions-only  # Install only editor extensions
 #   ./setup.sh --help
+#
+# Non-interactive sudo (no password prompts):
+#   SETUP_PASSWORD=mypass ./setup.sh
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -172,6 +175,34 @@ print_summary() {
   return 0
 }
 
+# ── Sudo helper ──────────────────────────────────────────────────────────────
+# Uses SETUP_PASSWORD if set, otherwise relies on cached sudo credentials.
+
+run_sudo() {
+  if [ -n "${SETUP_PASSWORD:-}" ]; then
+    echo "$SETUP_PASSWORD" | sudo -S "$@" 2>/dev/null
+  else
+    sudo "$@"
+  fi
+}
+
+# Validate sudo access up front (and start keepalive if running standalone)
+ensure_sudo() {
+  if [ -n "${SETUP_PASSWORD:-}" ]; then
+    if echo "$SETUP_PASSWORD" | sudo -S true 2>/dev/null; then
+      record_installed "sudo access (via SETUP_PASSWORD)"
+    else
+      echo "❌ SETUP_PASSWORD is set but sudo authentication failed." >&2
+      exit 1
+    fi
+  elif sudo -n true 2>/dev/null; then
+    record_skipped "sudo access" "already available"
+  else
+    echo "⚠️  Some steps require sudo. You may be prompted for your password."
+    echo "   Set SETUP_PASSWORD=<password> to avoid prompts."
+  fi
+}
+
 # ── Brew helpers ─────────────────────────────────────────────────────────────
 
 set_brew_env() {
@@ -307,6 +338,16 @@ if [ "$DRY_RUN" = true ]; then
     fi
   fi
 
+  # Sleep prevention
+  if [ "${APPLY_SLEEP_DEFAULTS:-false}" = true ]; then
+    current_sleep="$(pmset -g | grep '^ sleep' | awk '{print $2}' 2>/dev/null || echo "?")"
+    if [ "$current_sleep" = "0" ]; then
+      echo "  ✅ Sleep prevention (already disabled)"
+    else
+      echo "  ❓ Sleep prevention — would disable sleep (current: ${current_sleep}min). Requires sudo."
+    fi
+  fi
+
   echo ""
   echo "Run without --dry-run to apply."
   exit 0
@@ -364,6 +405,10 @@ echo "║          Mac Mini Setup — Full Run           ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
+# ── 0. Sudo access ───────────────────────────────────────────────────────────
+set_step "checking sudo access"
+ensure_sudo
+
 # ── 1. Xcode CLT ─────────────────────────────────────────────────────────────
 set_step "checking Apple Command Line Tools"
 
@@ -391,11 +436,23 @@ if command -v brew &>/dev/null; then
 else
   echo ">>> Installing Homebrew..."
   echo "    (requires admin/sudo access)"
-  if NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" 2>&1; then
+  # If SETUP_PASSWORD is set, create a temporary askpass script so Homebrew's
+  # internal sudo calls don't prompt interactively.
+  BREW_ENV=(NONINTERACTIVE=1)
+  if [ -n "${SETUP_PASSWORD:-}" ]; then
+    ASKPASS_SCRIPT="$(mktemp)"
+    printf '#!/bin/sh\necho "%s"\n' "$SETUP_PASSWORD" > "$ASKPASS_SCRIPT"
+    chmod +x "$ASKPASS_SCRIPT"
+    BREW_ENV+=(SUDO_ASKPASS="$ASKPASS_SCRIPT")
+    # Pre-cache sudo so Homebrew doesn't need askpass at all
+    echo "$SETUP_PASSWORD" | sudo -S true 2>/dev/null || true
+  fi
+  if env "${BREW_ENV[@]}" /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" 2>&1; then
     record_installed "Homebrew"
   else
     record_failed "Homebrew" "installation failed"
   fi
+  [ -n "${ASKPASS_SCRIPT:-}" ] && rm -f "$ASKPASS_SCRIPT"
 fi
 
 if set_brew_env; then
@@ -462,7 +519,7 @@ done
 # Sublime Text → subl
 SUBL_BIN="/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl"
 if [ -f "$SUBL_BIN" ] && ! command -v subl &>/dev/null; then
-  ln -sf "$SUBL_BIN" /usr/local/bin/subl 2>/dev/null || sudo ln -sf "$SUBL_BIN" /usr/local/bin/subl
+  ln -sf "$SUBL_BIN" /usr/local/bin/subl 2>/dev/null || run_sudo ln -sf "$SUBL_BIN" /usr/local/bin/subl
   record_installed "subl symlink"
 elif command -v subl &>/dev/null; then
   record_skipped "subl symlink" "already available"
@@ -471,7 +528,7 @@ fi
 # VS Code → code (usually handled by VS Code itself, but ensure it)
 VSCODE_BIN="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
 if [ -f "$VSCODE_BIN" ] && ! command -v code &>/dev/null; then
-  ln -sf "$VSCODE_BIN" /usr/local/bin/code 2>/dev/null || sudo ln -sf "$VSCODE_BIN" /usr/local/bin/code
+  ln -sf "$VSCODE_BIN" /usr/local/bin/code 2>/dev/null || run_sudo ln -sf "$VSCODE_BIN" /usr/local/bin/code
   record_installed "code symlink"
 elif command -v code &>/dev/null; then
   record_skipped "code symlink" "already available"
@@ -800,6 +857,30 @@ if [ "${APPLY_RAYCAST_HOTKEY:-true}" = true ]; then
   run_cmd "spotlight: disable Cmd+Space" defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 64 '{ enabled = 0; value = { parameters = (65535, 49, 1048576); type = "standard"; }; }' || true
   run_cmd "spotlight: disable Cmd+Alt+Space" defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 65 '{ enabled = 0; value = { parameters = (65535, 49, 1572864); type = "standard"; }; }' || true
   echo "  ℹ️  Open Raycast after setup and set Cmd+Space as its hotkey in preferences."
+fi
+
+# ── 13c. Prevent sleep (always-on server) ────────────────────────────────────
+
+if [ "${APPLY_SLEEP_DEFAULTS:-false}" = true ]; then
+  echo ">>> Configuring power management (never sleep)..."
+  # pmset -a = all power sources (battery + charger)
+  # sleep 0 = never sleep the system
+  # displaysleep 0 = never sleep the display
+  # disksleep 0 = never sleep the disk
+  # womp 1 = wake on magic packet (Wake-on-LAN)
+  run_sudo pmset -a sleep 0 displaysleep 0 disksleep 0 2>/dev/null && \
+    record_installed "pmset: never sleep" || \
+    record_failed "pmset: never sleep" "pmset command failed"
+
+  # Enable Wake-on-LAN (useful for remote management)
+  run_sudo pmset -a womp 1 2>/dev/null && \
+    record_installed "pmset: wake on LAN" || \
+    record_failed "pmset: wake on LAN" "pmset command failed"
+
+  # Restart on power failure (auto-boot after outage)
+  run_sudo pmset -a autorestart 1 2>/dev/null && \
+    record_installed "pmset: auto-restart on power failure" || \
+    record_failed "pmset: auto-restart on power failure" "pmset command failed"
 fi
 
 # ── 14. Create directories ───────────────────────────────────────────────────
