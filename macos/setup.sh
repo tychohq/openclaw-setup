@@ -737,6 +737,8 @@ if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
   if ! command -v claude &>/dev/null; then
     echo ">>> Installing Claude Code..."
     if curl -fsSL https://claude.ai/install.sh | bash 2>&1; then
+      # Ensure claude is in PATH for the rest of this script run
+      export PATH="$HOME/.local/bin:$PATH"
       record_installed "Claude Code"
     else
       record_failed "Claude Code" "installation failed"
