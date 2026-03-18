@@ -504,6 +504,18 @@ create_backup() {
   printf '%s\n' "$CRON_STATUS_BEFORE_JSON" > "$BACKUP_DIR/cron-status-before.json"
   printf '%s\n' "$SKILLS_BEFORE_JSON" > "$BACKUP_DIR/skills-before.json"
   write_metadata_file
+
+  # Native backup: compressed archive with manifest + integrity verification.
+  # Non-fatal — flat-file backup above is the primary rollback source.
+  # Uses --no-include-workspace (config + credentials + sessions, not workspace
+  # files which are already backed up by Arq).
+  if openclaw backup create --no-include-workspace --verify --json \
+      --output "$BACKUP_DIR/native-backup.tar.gz" \
+      > "$BACKUP_DIR/native-backup-result.json" 2>&1; then
+    log "Native backup created and verified: $BACKUP_DIR/native-backup.tar.gz"
+  else
+    warn "Native backup failed (non-fatal, flat-file backup is primary)"
+  fi
 }
 
 run_update() {
