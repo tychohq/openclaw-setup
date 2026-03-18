@@ -348,6 +348,16 @@ if [ "$DRY_RUN" = true ]; then
     fi
   fi
 
+  # Automatic updates
+  if [ "${APPLY_UPDATE_DEFAULTS:-false}" = true ]; then
+    auto_install="$(defaults read /Library/Preferences/com.apple.SoftwareUpdate AutomaticallyInstallMacOSUpdates 2>/dev/null || echo "?")"
+    if [ "$auto_install" = "0" ]; then
+      echo "  ✅ Automatic updates (already disabled)"
+    else
+      echo "  ❓ Automatic updates — would disable all auto-updates. Requires sudo."
+    fi
+  fi
+
   echo ""
   echo "Run without --dry-run to apply."
   exit 0
@@ -883,6 +893,29 @@ if [ "${APPLY_SLEEP_DEFAULTS:-false}" = true ]; then
   run_sudo pmset -a autorestart 1 2>/dev/null && \
     record_installed "pmset: auto-restart on power failure" || \
     record_failed "pmset: auto-restart on power failure" "pmset command failed"
+fi
+
+# ── 13d. Disable automatic software updates ──────────────────────────────────
+# This machine should NEVER restart without explicit human approval.
+
+if [ "${APPLY_UPDATE_DEFAULTS:-false}" = true ]; then
+  echo ">>> Disabling automatic software updates (no surprise restarts)..."
+  SU_PLIST="/Library/Preferences/com.apple.SoftwareUpdate"
+  run_sudo defaults write "$SU_PLIST" AutomaticCheckEnabled -bool false 2>/dev/null && \
+    record_installed "updates: disable automatic check" || \
+    record_failed "updates: disable automatic check" "defaults write failed"
+  run_sudo defaults write "$SU_PLIST" AutomaticDownload -bool false 2>/dev/null && \
+    record_installed "updates: disable automatic download" || \
+    record_failed "updates: disable automatic download" "defaults write failed"
+  run_sudo defaults write "$SU_PLIST" AutomaticallyInstallMacOSUpdates -bool false 2>/dev/null && \
+    record_installed "updates: disable automatic macOS install" || \
+    record_failed "updates: disable automatic macOS install" "defaults write failed"
+  run_sudo defaults write "$SU_PLIST" CriticalUpdateInstall -bool false 2>/dev/null && \
+    record_installed "updates: disable critical update auto-install" || \
+    record_failed "updates: disable critical update auto-install" "defaults write failed"
+  run_sudo defaults write "$SU_PLIST" ConfigDataInstall -bool false 2>/dev/null && \
+    record_installed "updates: disable config data auto-install" || \
+    record_failed "updates: disable config data auto-install" "defaults write failed"
 fi
 
 # ── 14. Create directories ───────────────────────────────────────────────────

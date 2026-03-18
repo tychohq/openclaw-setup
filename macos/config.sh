@@ -153,6 +153,7 @@ APPLY_FINDER_DEFAULTS=true
 APPLY_GLOBAL_DEFAULTS=true
 APPLY_SCREENSHOT_DEFAULTS=true
 APPLY_SLEEP_DEFAULTS=true          # Never sleep (always-on server mode)
+APPLY_UPDATE_DEFAULTS=true         # Disable ALL automatic software updates & restarts
 
 # Dock settings (only if APPLY_DOCK_DEFAULTS=true)
 DOCK_AUTOHIDE=true
