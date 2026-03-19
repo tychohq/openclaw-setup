@@ -606,39 +606,6 @@ else
   record_failed "fnm" "not found — install fnm first (included in FORMULAE)"
 fi
 
-# ── 8b. npm → bun wrapper ─────────────────────────────────────────────────────
-# Replace npm with a wrapper that reminds you to use bun instead.
-# The real npm is preserved as npm-real for escape-hatch use.
-
-echo ">>> Setting up npm → bun redirect wrapper..."
-NPM_PATH="$(command -v npm 2>/dev/null || true)"
-if [ -n "$NPM_PATH" ] && [ -f "$NPM_PATH" ]; then
-  # Check if it's already our wrapper (starts with #!/bin/bash and mentions bun)
-  if head -2 "$NPM_PATH" 2>/dev/null | grep -q "bun"; then
-    record_skipped "npm wrapper" "already installed"
-  else
-    NPM_DIR="$(dirname "$NPM_PATH")"
-    NPM_REAL="$NPM_DIR/npm-real"
-    # Preserve original npm as npm-real (if not already done)
-    if [ ! -e "$NPM_REAL" ]; then
-      run_cmd "npm-real backup" cp "$NPM_PATH" "$NPM_REAL"
-    fi
-    # Write the wrapper
-    cat > "$NPM_PATH" << 'WRAPPER'
-#!/bin/bash
-echo "❌ Don't use npm. Use bun."
-echo "   bun install / bun install -g <pkg> / bun run <script>"
-echo ""
-echo "   If you REALLY can't use bun, run: npm-real $@"
-exit 1
-WRAPPER
-    chmod +x "$NPM_PATH"
-    record_installed "npm → bun wrapper"
-  fi
-else
-  record_skipped "npm wrapper" "npm not found (Node may not be installed yet)"
-fi
-
 # ── 9. Rust (optional) ───────────────────────────────────────────────────────
 set_step "installing Rust"
 
