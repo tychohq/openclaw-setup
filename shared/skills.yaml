@@ -39,3 +39,4 @@ skills:
   - name: system-watchdog
     source: clawhub
     slug: system-watchdog
+    note: v2.0 — anomaly-based detection, unified Linux + macOS
