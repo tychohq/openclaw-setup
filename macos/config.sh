@@ -56,11 +56,11 @@ FORMULAE=(
 # ── Homebrew Casks (GUI apps) ─────────────────────────────────────────────────
 CASKS=(
   # Browsers
-  arc
+  # arc
   google-chrome
 
   # Dev tools
-  cursor
+  # cursor
   visual-studio-code
   docker-desktop
   sublime-text
@@ -91,8 +91,8 @@ CASKS=(
   spokenly
 
   # Media
-  spotify
-  vlc
+  # spotify
+  # vlc
   # obs
 
   # System

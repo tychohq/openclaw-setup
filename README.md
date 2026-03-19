@@ -86,7 +86,7 @@ The script then:
 
 1. Installs Homebrew
 2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, and `jq`
-3. Installs apps like Slack, Discord, Spokenly, Cursor, Arc, and 1Password
+3. Installs apps like Slack, Discord, Spokenly, VS Code, and 1Password
 4. Installs Bun and Node.js
 5. Applies Mac settings like Dock and Finder defaults
 6. Creates the standard folders used by this setup
@@ -126,27 +126,23 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    12. `uv`
    13. `wget`
 3. The setup script installs these apps by default:
-   1. Arc
-   2. Google Chrome
-   3. Cursor
-   4. Visual Studio Code
-   5. Docker Desktop
-   6. Sublime Text
-   7. Warp
-   8. Slack
-   9. Discord
-   10. Zoom
-   11. 1Password
-   12. 1Password CLI
-   13. Raycast
-   14. Notion
-   15. ChatGPT
-   16. Claude
-   17. Spokenly
-   18. Spotify
-   19. VLC
-   20. Tailscale
-   21. Hack Nerd Font
+   1. Google Chrome
+   2. Visual Studio Code
+   3. Docker Desktop
+   4. Sublime Text
+   5. Warp
+   6. Slack
+   7. Discord
+   8. Zoom
+   9. 1Password
+   10. 1Password CLI
+   11. Raycast
+   12. Notion
+   13. ChatGPT
+   14. Claude
+   15. Spokenly
+   16. Tailscale
+   17. Hack Nerd Font
 4. It also sets up:
    1. Node.js 24 through `fnm`
    2. Bun
