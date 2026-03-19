@@ -162,7 +162,7 @@ From here, Claude Code handles the rest. Tell it to set up OpenClaw and have you
 Claude Code will:
 
 1. Run `openclaw onboard --non-interactive` to configure the gateway, credentials, and workspace
-2. Use `--secret-input-mode ref` so API keys are stored as environment variable references, not plaintext in config
+2. Store API keys in `~/.openclaw/.env` and have config reference them by env var name (`--secret-input-mode ref`)
 3. Apply patches from this repo (`shared/patches/`) to configure agent defaults, channels, and plugins
 4. Verify the installation with `openclaw doctor`
 
