@@ -123,7 +123,7 @@ The live source of truth is [`macos/config.sh`](config.sh).
 
 Once the setup script finishes, **close that Terminal window** and **open a new one** (so the new shell aliases are loaded).
 
-Then log in to Claude Code:
+Log in to Claude Code:
 
 ```bash
 claude auth login
@@ -131,10 +131,18 @@ claude auth login
 
 This opens a browser sign-in flow for your Anthropic account. Follow the prompts to authenticate.
 
+Then generate a setup token for OpenClaw:
+
+```bash
+claude setup-token
+```
+
+This creates a long-lived token tied to your Claude subscription. **Copy the token** — you will paste it into Claude Code in the next step.
+
 What you should see:
 
-- Claude Code opens a sign-in page in your browser
-- A success message after you finish logging in
+- `claude auth login` opens a sign-in page in your browser, then shows a success message
+- `claude setup-token` displays a token starting with `sk-ant-`. Copy it.
 
 ## Step 4: Start Claude Code
 
@@ -159,19 +167,16 @@ What you should see:
 
 From here, Claude Code handles the rest. Tell it to set up OpenClaw and have your API keys ready.
 
+Tell Claude Code to set up OpenClaw and paste your setup token from Step 3 when it asks.
+
 Claude Code will:
 
-1. Run `openclaw onboard --non-interactive` to configure the gateway, credentials, and workspace
-2. Store API keys in `~/.openclaw/.env` and have config reference them by env var name (`--secret-input-mode ref`)
-3. Apply patches from this repo (`shared/patches/`) to configure agent defaults, channels, and plugins
+1. Run `openclaw onboard --non-interactive` with your setup token to configure the gateway, credentials, and workspace using your Claude subscription
+2. Install the gateway daemon
+3. Apply patches from this repo (`shared/patches/`) to configure agent defaults and plugins
 4. Verify the installation with `openclaw doctor`
 
-You will need at least:
-
-- An **Anthropic API key** (or another AI provider key)
-- Optionally, a chat channel token (Discord, Telegram, or Slack) if you want to message your agent
-
-If you do not have channel tokens yet, that is fine. Claude Code will skip channel setup and you can add them later.
+If you have chat channel tokens (Discord, Telegram, or Slack), give them to Claude Code and it will configure the right channel. If you do not have any yet, that is fine — you can add channels later.
 
 
 <details>
