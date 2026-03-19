@@ -155,22 +155,7 @@ What you should see:
 - Claude Code starts in the `openclaw-setup` directory
 - A prompt where you can type instructions
 
-## Step 5: Optional preview mode
-
-If you want to review the plan before changing anything:
-
-```bash
-git clone https://github.com/tychohq/openclaw-setup.git ~/projects/openclaw-setup
-cd ~/projects/openclaw-setup
-bash macos/setup.sh --dry-run
-```
-
-What you should see:
-
-- `❓` items that would be installed
-- `✅` items that are already there
-
-## Step 6: Create your OpenClaw config files
+## Step 5: Create your OpenClaw config files
 
 The bootstrap command clones or updates this repo at `~/projects/openclaw-setup` automatically. The commands below assume you are running them from that folder.
 
@@ -192,7 +177,7 @@ What you should see:
 - Usually no output at all
 - Three new files in the repo root
 
-## Step 6b: Fill in the files
+## Step 5b: Fill in the files
 
 You need at least:
 
@@ -321,7 +306,7 @@ Values needed for OpenClaw config:
 
 </details>
 
-## Step 7: Run OpenClaw setup
+## Step 6: Run OpenClaw setup
 
 ```bash
 bash shared/scripts/setup-openclaw.sh \
@@ -343,7 +328,7 @@ What you should see:
 - `✅ Config installed` or `✅ Config merged`
 - `✅ Gateway installed and started` or `✅ Gateway restarted`
 
-## Step 8: Check your install
+## Step 7: Check your install
 
 ```bash
 bash shared/scripts/setup-openclaw.sh --check
@@ -355,7 +340,7 @@ What you should see:
 - `✅ Config file exists`
 - `✅ OpenClaw installation looks good!`
 
-## Step 9: Optional workspace bootstrap
+## Step 8: Optional workspace bootstrap
 
 If you also want starter workspace files:
 
