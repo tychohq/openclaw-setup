@@ -155,70 +155,27 @@ What you should see:
 - Claude Code starts in the `openclaw-setup` directory
 - A prompt where you can type instructions
 
-## Step 5: Create your OpenClaw config files
+## Step 5: Set up OpenClaw
 
-The bootstrap command clones or updates this repo at `~/projects/openclaw-setup` automatically. The commands below assume you are running them from that folder.
+From here, Claude Code handles the rest. Tell it to set up OpenClaw and have your API keys ready.
 
-From the repo root (by default `~/projects/openclaw-setup` when you used the bootstrap command), run:
+Claude Code will:
 
-```bash
-cp shared/config/openclaw-config.template.json openclaw-secrets.json
-cp shared/config/openclaw-env.template openclaw-secrets.env
-cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json
-```
+1. Run `openclaw onboard --non-interactive` to configure the gateway, credentials, and workspace
+2. Use `--secret-input-mode ref` so API keys are stored as environment variable references, not plaintext in config
+3. Apply patches from this repo (`shared/patches/`) to configure agent defaults, channels, and plugins
+4. Verify the installation with `openclaw doctor`
 
-Plain-English explanation:
+You will need at least:
 
-- These commands make local copies of the template files
-- You will edit the local copies with your real keys and IDs
+- An **Anthropic API key** (or another AI provider key)
+- Optionally, a chat channel token (Discord, Telegram, or Slack) if you want to message your agent
 
-What you should see:
-
-- Usually no output at all
-- Three new files in the repo root
-
-## Step 5b: Fill in the files
-
-You need at least:
-
-- One AI provider key
-- One chat channel token
-
-### `openclaw-secrets.env`
-
-Use this for secret keys and tokens.
-
-Examples:
-
-```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-OPENROUTER_API_KEY=sk-or-...
-GEMINI_API_KEY=AI...
-
-DISCORD_TOKEN=...
-TELEGRAM_BOT_TOKEN=...
-SLACK_BOT_TOKEN=...
-SLACK_APP_TOKEN=...
-```
-
-### `openclaw-secrets.json`
-
-Use this for channel setup and general OpenClaw settings.
-
-For Discord, the most important fields are:
-
-- Your bot token
-- Your Discord user ID
-- Your server ID
-
-### `openclaw-auth-profiles.json`
-
-Use this for provider auth profiles such as Anthropic, OpenAI, and OpenRouter.
+If you do not have channel tokens yet, that is fine. Claude Code will skip channel setup and you can add them later.
 
 
 <details>
-<summary><strong>📱 Setting up a Discord Bot</strong></summary>
+<summary><strong>Setting up a Discord Bot</strong></summary>
 
 1. Go to https://discord.com/developers/applications.
 2. Click **New Application**, give it a name such as `OpenClaw`, and create it.
@@ -253,16 +210,10 @@ Use this for provider auth profiles such as Anthropic, OpenAI, and OpenRouter.
 10. To find your Discord User ID, enable **Developer Mode** in Discord under **App Settings** → **Advanced** → **Developer Mode**, then right-click your name and choose **Copy User ID**.
 11. To find your Server ID, right-click the server icon and choose **Copy Server ID**.
 
-Values needed for OpenClaw config:
-
-- `DISCORD_TOKEN` in the `.env` file
-- Your user ID in the authorized senders list
-- Your server or guild ID in the Discord channel config
-
 </details>
 
 <details>
-<summary><strong>📱 Setting up a Telegram Bot</strong></summary>
+<summary><strong>Setting up a Telegram Bot</strong></summary>
 
 1. Open Telegram and search for `@BotFather`.
 2. Send `/newbot`.
@@ -275,15 +226,10 @@ Values needed for OpenClaw config:
 7. To find your Telegram User ID, search for `@userinfobot`, start a chat, and read the numeric user ID it gives you.
 8. Optional: send `/setdescription` and `/setabouttext` to `@BotFather` if you want to customize your bot profile.
 
-Values needed for OpenClaw config:
-
-- `TELEGRAM_BOT_TOKEN` in the `.env` file
-- Your numeric user ID for authorized senders
-
 </details>
 
 <details>
-<summary><strong>📱 Setting up a Slack Bot</strong></summary>
+<summary><strong>Setting up a Slack Bot</strong></summary>
 
 1. Go to https://api.slack.com/apps.
 2. Click **Create New App** → **From a manifest**.
@@ -299,112 +245,21 @@ Values needed for OpenClaw config:
 7. Get the app token from **Basic Information** → **App-Level Tokens** by generating a token with the `connections:write` scope. It starts with `xapp-`.
    - What you should see: both tokens are shown in Slack after creation, with the prefixes above.
 
-Values needed for OpenClaw config:
-
-- `SLACK_BOT_TOKEN` in the `.env` file
-- `SLACK_APP_TOKEN` in the `.env` file
-
 </details>
-
-## Step 6: Run OpenClaw setup
-
-```bash
-bash shared/scripts/setup-openclaw.sh \
-  --config openclaw-secrets.json \
-  --env openclaw-secrets.env \
-  --auth-profiles openclaw-auth-profiles.json
-```
-
-Plain-English explanation:
-
-- Copies your settings into `~/.openclaw/`
-- Installs the OpenClaw background service if needed
-- Starts or restarts the service
-
-What you should see:
-
-- `>>> Setting up OpenClaw...`
-- `✅ Directory: ~/.openclaw`
-- `✅ Config installed` or `✅ Config merged`
-- `✅ Gateway installed and started` or `✅ Gateway restarted`
-
-## Step 7: Check your install
-
-```bash
-bash shared/scripts/setup-openclaw.sh --check
-```
-
-What you should see:
-
-- `✅ openclaw CLI found`
-- `✅ Config file exists`
-- `✅ OpenClaw installation looks good!`
-
-## Step 8: Optional workspace bootstrap
-
-If you also want starter workspace files:
-
-```bash
-bash shared/scripts/bootstrap-openclaw-workspace.sh
-```
-
-What you should see:
-
-- `>>> Setting up OpenClaw workspace...`
-- `✅` lines for folders and copied files
-
-## Helpful Commands
-
-### Preview the Mac setup without changing anything
-
-```bash
-bash macos/setup.sh --dry-run
-```
-
-### Rerun the full Mac setup
-
-```bash
-cd ~/projects/openclaw-setup
-bash macos/setup.sh
-```
-
-### Include editor extensions too
-
-```bash
-bash macos/setup.sh --with-extensions
-```
 
 ## Troubleshooting
 
-### “Unknown argument”
-
-You probably mistyped a flag. Run:
-
-```bash
-bash macos/setup.sh --help
-```
-
 ### “Homebrew is not available. Cannot continue.”
 
-This usually means the account is not an admin account. Sign in as an admin or give this user admin access, then rerun the script.
+This usually means the account is not an admin account. Sign in as an admin or give this user admin access, then rerun the bootstrap command.
 
-### “Permission denied” when running a script
+### The bootstrap script stops with an error
 
-Use `bash ...` in front of the script path instead of double-clicking the file.
+Read the last `❌` message, fix the issue, and run the same bootstrap command again. The script is safe to rerun.
 
-### “Config file not found” during OpenClaw setup
+### OpenClaw health check fails
 
-Make sure you ran the three `cp shared/config/...` commands from the repo root first.
-
-### OpenClaw service did not start
-
-Run:
-
-```bash
-bash shared/scripts/setup-openclaw.sh --check
-```
-
-Then read the last `❌` message and rerun the main setup command after fixing it.
+Run `openclaw doctor` from Claude Code to diagnose issues.
 
 ## License
 
