@@ -606,6 +606,24 @@ else
   record_failed "fnm" "not found — install fnm first (included in FORMULAE)"
 fi
 
+# ── 8b. npm global packages ──────────────────────────────────────────────────
+set_step "installing npm packages"
+
+echo ">>> npm global packages..."
+if command -v npm &>/dev/null; then
+  for spec in "${NPM_GLOBALS[@]-}"; do
+    [ -z "$spec" ] && continue
+    pkg="${spec%@*}"
+    if npm ls -g "$pkg" &>/dev/null; then
+      record_skipped "npm:$pkg" "already installed"
+    else
+      run_cmd "npm:$spec" npm install -g "$spec" || true
+    fi
+  done
+else
+  record_skipped "npm global packages" "npm not found"
+fi
+
 # ── 9. Rust (optional) ───────────────────────────────────────────────────────
 set_step "installing Rust"
 

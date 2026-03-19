@@ -86,8 +86,8 @@ CASKS=(
   # figma
 
   # AI
-  chatgpt
-  claude
+  # chatgpt
+  # claude
   spokenly
 
   # Media
@@ -114,6 +114,14 @@ BUN_GLOBALS=(
   # "@biomejs/biome@2.3.13"
   # "turbo@2.8.0"
   # "pyright@1.1.408"
+)
+
+# ── npm Global Packages ─────────────────────────────────────────────────────
+# Same packages as Bun globals, installed via npm for compatibility
+NPM_GLOBALS=(
+  "typescript@5.9.3"
+  "tsx@4.21.0"
+  "vercel@50.9.5"
 )
 
 # ── VS Code / Cursor Extensions ──────────────────────────────────────────────

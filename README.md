@@ -138,11 +138,9 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    10. 1Password CLI
    11. Raycast
    12. Notion
-   13. ChatGPT
-   14. Claude
-   15. Spokenly
-   16. Tailscale
-   17. Hack Nerd Font
+   13. Spokenly
+   14. Tailscale
+   15. Hack Nerd Font
 4. It also sets up:
    1. Node.js 24 through `fnm`
    2. Bun
