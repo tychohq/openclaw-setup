@@ -39,69 +39,37 @@ If you want a guided setup companion while you work through these steps, open [c
 
 ### 1. Paste this into Terminal
 
-If Claude Code is already logged in on this Mac, this is the recommended command:
+Replace `mypassword` with your Mac's admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash -s -- --handoff
+SETUP_PASSWORD=mypassword curl -fsSL mac.brennerspear.com | bash
 ```
 
-What this command does:
+This downloads and runs the bootstrap script, which:
 
-- `curl` downloads the starter script from GitHub
-- `| bash -s -- --handoff` runs that script and passes `--handoff` into `macos/setup.sh`
-- At the end of setup, Claude Code opens so it can help if anything breaks
+1. Installs **Apple Command Line Tools** (compilers, `git`)
+2. Installs **Homebrew** (the Mac package manager)
+3. Installs **CLI tools**: `git`, `gh`, `tmux`, `uv`, `jq`, `fzf`, `ffmpeg`, and more
+4. Installs **apps**: Chrome, Arc, Cursor, VS Code, Warp, Slack, Discord, 1Password, Raycast, Claude, and more
+5. Installs **Bun** and **Node.js 24**
+6. Applies **Mac settings**: Dock, Finder, dark mode, screenshots, sleep prevention
+7. Sets up **shell aliases** in `~/.zshrc` (including `cc` for Claude Code)
+8. Clones this repo to `~/projects/openclaw-setup`
+
+macOS will show pop-ups asking to install developer tools or approve permissions. Click **Install** or **Allow** on any pop-ups that appear.
 
 What you should see:
 
 - A box that says `Mac Mini Setup — Bootstrap`
-- A message asking for your Mac password
-- A message about Apple Command Line Tools if they are not installed yet
-- Claude Code opening near the end of setup if the install completes cleanly
-
-If Claude Code is not logged in yet, use the standard command instead:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/bootstrap.sh | bash
-```
-
-Short aliases for the same flows:
-
-```bash
-curl -fsSL mac.brennerspear.com | bash -s -- --handoff
-curl -fsSL mac.brennerspear.com | bash
-```
-
-### 2. If macOS asks to install Apple Command Line Tools, click Install
-
-These tools are required for `git`, compilers, and several developer tools.
-
-What you should see:
-
-- A macOS pop-up asking to install developer tools, or
-- A message that says they are already installed
-
-### 3. Wait while the setup script runs
-
-The script then:
-
-1. Installs Homebrew
-2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, and `jq`
-3. Installs apps like Slack, Discord, Spokenly, Cursor, Arc, and 1Password
-4. Installs Bun and Node.js
-5. Applies Mac settings like Dock and Finder defaults
-6. Creates the standard folders used by this setup
-
-What you should see:
-
 - Lines starting with `>>>` for each stage
 - Lots of `✅` lines for things that were installed
 - A final `Setup Summary`
 
-If the script stops, read the last `❌` message, fix that issue, and run the same command again. The setup is designed to be safe to rerun.
+If the script stops, read the last `❌` message, fix that issue, and run the same command again. The setup is safe to rerun.
 
 
 <details>
-<summary><strong>🔎 What the bootstrap and setup scripts do by default</strong></summary>
+<summary><strong>What the bootstrap and setup scripts do by default</strong></summary>
 
 The live source of truth is [`macos/config.sh`](macos/config.sh).
 
@@ -161,40 +129,41 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    4. Rust
    5. Any apps or tools still commented out in `macos/config.sh`
 
-What you should see:
-
-- `>>>` stage headers as each part runs
-- `✅` lines for tools and apps that finished installing
-- A `Setup Summary` near the end
-
 </details>
 
 
-### 4. If you have a Claude subscription, sign in to Claude Code
+### 2. Log in to Claude Code
 
-The Mac setup installs Claude Code for you. If you sign in now, Claude Code can help with the rest of the setup.
+Once the setup script finishes, **close that Terminal window** and **open a new one** (so the new shell aliases are loaded).
+
+Then log in to Claude Code:
 
 ```bash
 claude auth login
-claude auth status --text
 ```
 
-What these commands do:
-
-- `claude auth login` starts the Claude Code sign-in flow for your Anthropic account
-- `claude auth status --text` confirms whether Claude Code is signed in
+This opens a browser sign-in flow for your Anthropic account. Follow the prompts to authenticate.
 
 What you should see:
 
-- Claude Code opens a sign-in flow
-- A successful status message after you finish logging in
+- Claude Code opens a sign-in page in your browser
+- A success message after you finish logging in
 
-If you want Claude Code to take over right away after that:
+### 3. Start Claude Code
+
+Now start Claude Code with full permissions:
 
 ```bash
 cd ~/projects/openclaw-setup
-bash macos/setup.sh --handoff
+cc
 ```
+
+`cc` is a shell alias set up by the bootstrap script. It runs `claude --dangerously-skip-permissions`, which lets Claude Code read, write, and run commands without asking for approval on each one.
+
+What you should see:
+
+- Claude Code starts in the `openclaw-setup` directory
+- A prompt where you can type instructions
 
 ## Optional: Preview First Without Changing Anything
 
