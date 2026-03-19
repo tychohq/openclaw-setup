@@ -142,6 +142,9 @@ Now start Claude Code with full permissions:
 
 ```bash
 cd ~/projects/openclaw-setup
+```
+
+```bash
 cc
 ```
 
