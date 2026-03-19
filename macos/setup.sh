@@ -916,6 +916,9 @@ if [ "${APPLY_UPDATE_DEFAULTS:-false}" = true ]; then
   run_sudo defaults write "$SU_PLIST" ConfigDataInstall -bool false 2>/dev/null && \
     record_installed "updates: disable config data auto-install" || \
     record_failed "updates: disable config data auto-install" "defaults write failed"
+  run_sudo defaults write "$SU_PLIST" SplatEnabled -bool false 2>/dev/null && \
+    record_installed "updates: disable Rapid Security Response (RSR) auto-install" || \
+    record_failed "updates: disable RSR auto-install" "defaults write failed"
 fi
 
 # ── 14. Create directories ───────────────────────────────────────────────────
