@@ -988,22 +988,12 @@ done < "$CONFIG_FILE"
 
 echo ""
 echo "Next steps:"
-echo "  1. Sign into apps: 1Password, Raycast, Slack, Discord, Tailscale, etc."
-echo "  2. CLI logins: gh auth login, vercel login"
-echo "  3. Configure SSH: add keys to ~/.ssh/"
-if [ "${INSTALL_OPENCLAW:-false}" = true ]; then
-  if [ ! -f "${OC_CONFIG:-}" ]; then
-    echo "  4. Set up OpenClaw:"
-    echo "     cd $REPO_DIR"
-    echo "     cp shared/config/openclaw-config.template.json openclaw-secrets.json"
-    echo "     cp shared/config/openclaw-env.template openclaw-secrets.env"
-    echo "     cp shared/config/openclaw-auth-profiles.template.json openclaw-auth-profiles.json"
-    echo "     # Fill in your API keys, then:"
-    echo "     bash shared/scripts/setup-openclaw.sh --config openclaw-secrets.json --env openclaw-secrets.env --auth-profiles openclaw-auth-profiles.json"
-  else
-    echo "  4. Verify OpenClaw: cd $REPO_DIR && bash shared/scripts/setup-openclaw.sh --check"
-  fi
-fi
+echo "  1. Open Tailscale and sign in"
+echo "  2. Open Chrome and sign in"
+echo "  3. Close this Terminal, open a new one, then follow the README:"
+echo "     claude auth login"
+echo "     claude setup-token"
+echo "     cd ~/projects/openclaw-setup && cc"
 echo ""
 
 # ── Handoff to Claude Code ───────────────────────────────────────────────────
