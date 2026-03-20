@@ -16,7 +16,7 @@ NODE_VERSION="24"
 
 # ── Homebrew Taps ─────────────────────────────────────────────────────────────
 TAPS=(
-  # steipete/tap           # gifgrep, gogcli, remindctl, bird
+  steipete/tap           # gogcli
   # supabase/tap           # supabase CLI
   # tursodatabase/tap      # turso CLI
 )
@@ -37,6 +37,7 @@ FORMULAE=(
   tmux                     # terminal multiplexer
   uv                       # fast Python package manager
   wget                     # HTTP downloads
+  steipete/tap/gogcli      # Google Workspace CLI
 
   # Databases
   # postgresql@16
