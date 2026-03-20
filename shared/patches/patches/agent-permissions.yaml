@@ -19,7 +19,3 @@ steps:
   - type: config_set
     path: tools.elevated.enabled
     value: "true"
-
-  - type: config_set
-    path: agents.defaults.fsNotWorkspaceOnly
-    value: "true"
