@@ -636,6 +636,21 @@ else
   record_skipped "npm global packages" "npm not found"
 fi
 
+# ── 8c. Claude Code ─────────────────────────────────────────────────────────
+set_step "installing Claude Code"
+
+if command -v claude &>/dev/null; then
+  record_skipped "Claude Code" "already installed"
+else
+  echo ">>> Installing Claude Code..."
+  if curl -fsSL https://claude.ai/install.sh | bash 2>&1; then
+    export PATH="$HOME/.local/bin:$PATH"
+    record_installed "Claude Code"
+  else
+    record_failed "Claude Code" "installation failed"
+  fi
+fi
+
 # ── 9. Rust (optional) ───────────────────────────────────────────────────────
 set_step "installing Rust"
 
