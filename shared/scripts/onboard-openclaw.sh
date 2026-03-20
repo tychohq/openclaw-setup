@@ -107,58 +107,46 @@ openclaw onboard "${ONBOARD_ARGS[@]}" || true
 
 # ── Verify and fix Anthropic auth profile ─────────────────────────────────────
 # openclaw onboard sometimes doesn't write the auth profile correctly.
-# We verify all three pieces exist and fix up if needed.
+# We verify the config and credential exist and fix up via CLI if needed.
 
 PROFILE_ID="anthropic:default"
-AUTH_PROFILES="$HOME/.openclaw/agents/main/agent/auth-profiles.json"
-OC_CONFIG="$HOME/.openclaw/openclaw.json"
 
 echo ""
 echo ">>> Verifying Anthropic auth profile..."
 
-# Ensure auth-profiles.json exists
-mkdir -p "$(dirname "$AUTH_PROFILES")"
-if [ ! -f "$AUTH_PROFILES" ]; then
-  echo '{"version":1,"profiles":{}}' > "$AUTH_PROFILES"
-  chmod 600 "$AUTH_PROFILES"
-fi
-
-# 1. Check if token is in auth-profiles.json
-HAS_TOKEN=$(jq -e --arg id "$PROFILE_ID" '.profiles[$id].token // empty' "$AUTH_PROFILES" 2>/dev/null || true)
-if [ -z "$HAS_TOKEN" ]; then
-  echo "  Writing token to auth-profiles.json..."
-  TMP=$(mktemp)
-  jq --arg id "$PROFILE_ID" --arg token "$TOKEN" \
-    '.profiles[$id] = {"type":"token","provider":"anthropic","token":$token}' \
-    "$AUTH_PROFILES" > "$TMP"
-  mv "$TMP" "$AUTH_PROFILES"
-  chmod 600 "$AUTH_PROFILES"
-  echo "  ✅ Token written to auth-profiles.json"
-else
-  echo "  ✅ Token already in auth-profiles.json"
-fi
-
-# 2. Check if profile is in openclaw.json config
-HAS_CONFIG=$(jq -e --arg id "$PROFILE_ID" '.auth.profiles[$id] // empty' "$OC_CONFIG" 2>/dev/null || true)
-if [ -z "$HAS_CONFIG" ]; then
-  echo "  Adding profile to openclaw.json..."
-  openclaw config set "auth.profiles.$PROFILE_ID.provider" "anthropic" 2>/dev/null || true
-  openclaw config set "auth.profiles.$PROFILE_ID.mode" "token" 2>/dev/null || true
+# 1. Ensure the config profile entry exists
+if ! openclaw config get "auth.profiles.$PROFILE_ID" &>/dev/null; then
+  echo "  Adding profile to config..."
+  openclaw config set "auth.profiles.$PROFILE_ID.provider" "anthropic"
+  openclaw config set "auth.profiles.$PROFILE_ID.mode" "token"
   echo "  ✅ Profile added to config"
 else
   echo "  ✅ Profile already in config"
 fi
 
-# 3. Check if profile is in auth.order
-HAS_ORDER=$(jq -e --arg id "$PROFILE_ID" '.auth.order.anthropic // [] | index($id)' "$OC_CONFIG" 2>/dev/null || true)
-if [ -z "$HAS_ORDER" ] || [ "$HAS_ORDER" = "null" ]; then
+# 2. Ensure the profile is in auth.order
+CURRENT_ORDER=$(openclaw config get "auth.order.anthropic" 2>/dev/null || echo '[]')
+if ! echo "$CURRENT_ORDER" | grep -q "$PROFILE_ID"; then
   echo "  Adding profile to auth.order..."
-  CURRENT_ORDER=$(jq -c '.auth.order.anthropic // []' "$OC_CONFIG" 2>/dev/null || echo '[]')
-  NEW_ORDER=$(echo "$CURRENT_ORDER" | jq --arg id "$PROFILE_ID" '. + [$id] | unique')
-  openclaw config set "auth.order.anthropic" "$NEW_ORDER" 2>/dev/null || true
+  openclaw config set "auth.order.anthropic" "$(echo "$CURRENT_ORDER" | sed 's/]$//' | sed "s|$|, \"$PROFILE_ID\"]|" | sed 's/\[, /[/')"
   echo "  ✅ Profile added to auth.order"
 else
   echo "  ✅ Profile already in auth.order"
+fi
+
+# 3. Write the credential via openclaw agents add-auth (if available) or direct config
+#    The token must end up in auth-profiles.json for the agent to use it.
+if ! openclaw config get "auth.profiles.$PROFILE_ID" 2>/dev/null | grep -q "token"; then
+  echo "  Writing token credential..."
+  # Use openclaw onboard in minimal mode just for the credential
+  openclaw onboard --non-interactive --accept-risk \
+    --auth-choice token --token "$TOKEN" --token-provider anthropic \
+    --token-profile-id "$PROFILE_ID" \
+    --skip-channels --skip-daemon --skip-health --skip-skills --skip-search --skip-ui \
+    2>/dev/null || true
+  echo "  ✅ Token credential written"
+else
+  echo "  ✅ Token credential already present"
 fi
 
 # ── Write channel tokens to .env ──────────────────────────────────────────────
