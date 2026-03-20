@@ -103,7 +103,63 @@ fi
 
 echo ""
 echo ">>> Running openclaw onboard..."
-openclaw onboard "${ONBOARD_ARGS[@]}"
+openclaw onboard "${ONBOARD_ARGS[@]}" || true
+
+# ── Verify and fix Anthropic auth profile ─────────────────────────────────────
+# openclaw onboard sometimes doesn't write the auth profile correctly.
+# We verify all three pieces exist and fix up if needed.
+
+PROFILE_ID="anthropic:default"
+AUTH_PROFILES="$HOME/.openclaw/agents/main/agent/auth-profiles.json"
+OC_CONFIG="$HOME/.openclaw/openclaw.json"
+
+echo ""
+echo ">>> Verifying Anthropic auth profile..."
+
+# Ensure auth-profiles.json exists
+mkdir -p "$(dirname "$AUTH_PROFILES")"
+if [ ! -f "$AUTH_PROFILES" ]; then
+  echo '{"version":1,"profiles":{}}' > "$AUTH_PROFILES"
+  chmod 600 "$AUTH_PROFILES"
+fi
+
+# 1. Check if token is in auth-profiles.json
+HAS_TOKEN=$(jq -e --arg id "$PROFILE_ID" '.profiles[$id].token // empty' "$AUTH_PROFILES" 2>/dev/null || true)
+if [ -z "$HAS_TOKEN" ]; then
+  echo "  Writing token to auth-profiles.json..."
+  TMP=$(mktemp)
+  jq --arg id "$PROFILE_ID" --arg token "$TOKEN" \
+    '.profiles[$id] = {"type":"token","provider":"anthropic","token":$token}' \
+    "$AUTH_PROFILES" > "$TMP"
+  mv "$TMP" "$AUTH_PROFILES"
+  chmod 600 "$AUTH_PROFILES"
+  echo "  ✅ Token written to auth-profiles.json"
+else
+  echo "  ✅ Token already in auth-profiles.json"
+fi
+
+# 2. Check if profile is in openclaw.json config
+HAS_CONFIG=$(jq -e --arg id "$PROFILE_ID" '.auth.profiles[$id] // empty' "$OC_CONFIG" 2>/dev/null || true)
+if [ -z "$HAS_CONFIG" ]; then
+  echo "  Adding profile to openclaw.json..."
+  openclaw config set "auth.profiles.$PROFILE_ID.provider" "anthropic" 2>/dev/null || true
+  openclaw config set "auth.profiles.$PROFILE_ID.mode" "token" 2>/dev/null || true
+  echo "  ✅ Profile added to config"
+else
+  echo "  ✅ Profile already in config"
+fi
+
+# 3. Check if profile is in auth.order
+HAS_ORDER=$(jq -e --arg id "$PROFILE_ID" '.auth.order.anthropic // [] | index($id)' "$OC_CONFIG" 2>/dev/null || true)
+if [ -z "$HAS_ORDER" ] || [ "$HAS_ORDER" = "null" ]; then
+  echo "  Adding profile to auth.order..."
+  CURRENT_ORDER=$(jq -c '.auth.order.anthropic // []' "$OC_CONFIG" 2>/dev/null || echo '[]')
+  NEW_ORDER=$(echo "$CURRENT_ORDER" | jq --arg id "$PROFILE_ID" '. + [$id] | unique')
+  openclaw config set "auth.order.anthropic" "$NEW_ORDER" 2>/dev/null || true
+  echo "  ✅ Profile added to auth.order"
+else
+  echo "  ✅ Profile already in auth.order"
+fi
 
 # ── Write channel tokens to .env ──────────────────────────────────────────────
 
@@ -143,6 +199,12 @@ if [ -x "$PATCH_SCRIPT" ]; then
 else
   echo ">>> No patch script found at $PATCH_SCRIPT — skipping patches"
 fi
+
+# ── Restart gateway ────────────────────────────────────────────────────────────
+
+echo ""
+echo ">>> Restarting gateway to pick up new config..."
+openclaw gateway restart 2>/dev/null || openclaw gateway start 2>/dev/null || true
 
 # ── Health check ──────────────────────────────────────────────────────────────
 
