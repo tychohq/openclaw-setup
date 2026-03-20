@@ -1,0 +1,150 @@
+name: Test Mac Setup (E2E)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "macos/**"
+      - "shared/**"
+      - ".github/workflows/test-setup.yml"
+  pull_request:
+    paths:
+      - "macos/**"
+      - "shared/**"
+  workflow_dispatch:
+
+jobs:
+  test-bootstrap:
+    name: Bootstrap + Setup (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      SETUP_PASSWORD: ""
+      HOMEBREW_NO_ANALYTICS: 1
+      HOMEBREW_NO_AUTO_UPDATE: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run setup (skip casks, sleep, updates, remote access)
+        run: |
+          # Override config to skip GUI apps and sudo-only settings
+          # GH Actions runners already have Homebrew + Xcode CLT
+          cat > macos/config-ci.sh << 'EOF'
+          source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+
+          # No GUI apps in CI (no display)
+          CASKS=()
+
+          # No sudo-only system settings in CI
+          APPLY_SLEEP_DEFAULTS=false
+          APPLY_UPDATE_DEFAULTS=false
+          APPLY_REMOTE_ACCESS=false
+
+          # Skip Dock/Finder (no GUI)
+          APPLY_DOCK_DEFAULTS=false
+          APPLY_FINDER_DEFAULTS=false
+          APPLY_GLOBAL_DEFAULTS=false
+          APPLY_SCREENSHOT_DEFAULTS=false
+          APPLY_RAYCAST_HOTKEY=false
+          EOF
+
+          bash macos/setup.sh --config macos/config-ci.sh
+
+      - name: Verify CLI tools installed
+        run: |
+          echo "--- Homebrew formulae ---"
+          for cmd in fd ffmpeg fnm fzf gh git-filter-repo htop jq mas tmux uv wget; do
+            if command -v "$cmd" &>/dev/null || brew list --formula "$cmd" &>/dev/null; then
+              echo "✅ $cmd"
+            else
+              echo "❌ $cmd" && exit 1
+            fi
+          done
+
+          echo "--- Bun ---"
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          bun --version && echo "✅ bun"
+
+          echo "--- Node ---"
+          eval "$(fnm env --use-on-cd --version-file-strategy=recursive --shell bash)"
+          node --version && echo "✅ node"
+
+          echo "--- npm globals ---"
+          npm ls -g typescript && echo "✅ typescript"
+          npm ls -g tsx && echo "✅ tsx"
+          npm ls -g vercel && echo "✅ vercel"
+
+          echo "--- Claude Code ---"
+          export PATH="$HOME/.local/bin:$PATH"
+          claude --version && echo "✅ claude"
+
+      - name: Verify directories created
+        run: |
+          test -d "$HOME/projects" && echo "✅ ~/projects"
+          test -d "$HOME/Documents/Screenshots" && echo "✅ ~/Documents/Screenshots"
+
+      - name: Verify git config
+        run: |
+          git config --global init.defaultBranch | grep -q main && echo "✅ init.defaultBranch=main"
+          git config --global pull.rebase | grep -q true && echo "✅ pull.rebase=true"
+          git config --global push.autoSetupRemote | grep -q true && echo "✅ push.autoSetupRemote=true"
+
+      - name: Verify zshrc additions
+        run: |
+          grep -q "mac-mini-setup shell additions" "$HOME/.zshrc" && echo "✅ zshrc marker found"
+          grep -q "alias cc=" "$HOME/.zshrc" && echo "✅ cc alias"
+
+      - name: Verify setup is idempotent (rerun)
+        run: |
+          bash macos/setup.sh --config macos/config-ci.sh 2>&1 | tee /tmp/rerun.log
+          # Should see mostly "already installed" / skipped
+          if grep -c "❌" /tmp/rerun.log | grep -q "^0$"; then
+            echo "✅ Rerun had no failures"
+          else
+            echo "❌ Rerun had failures"
+            grep "❌" /tmp/rerun.log
+            exit 1
+          fi
+
+  test-onboard-script:
+    name: Onboard script (dry validation)
+    runs-on: macos-15
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify onboard script parses
+        run: |
+          bash -n shared/scripts/onboard-openclaw.sh && echo "✅ syntax ok"
+
+      - name: Verify onboard --help
+        run: |
+          bash shared/scripts/onboard-openclaw.sh --help
+
+      - name: Verify onboard requires --token
+        run: |
+          if bash shared/scripts/onboard-openclaw.sh 2>&1 | grep -q "token is required"; then
+            echo "✅ rejects missing token"
+          else
+            echo "❌ should require --token"
+            exit 1
+          fi
+
+  test-patches:
+    name: Validate patches
+    runs-on: macos-15
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install jq
+
+      - name: Validate all patch manifests
+        run: |
+          cd shared/patches
+          bash scripts/openclaw-patch validate
