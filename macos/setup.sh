@@ -1005,10 +1005,9 @@ echo ""
 echo "Next steps:"
 echo "  1. Open Tailscale and sign in"
 echo "  2. Open Chrome and sign in"
-echo "  3. Close this Terminal, open a new one, then follow the README:"
-echo "     claude auth login"
-echo "     claude setup-token"
-echo "     cd ~/projects/openclaw-setup && cc"
+echo "  3. Close this Terminal, open a new one, then:"
+echo "     cd ~/projects/openclaw-setup"
+echo "     cc"
 echo ""
 
 # ── Handoff to Claude Code ───────────────────────────────────────────────────

@@ -119,34 +119,9 @@ The live source of truth is [`macos/config.sh`](config.sh).
 </details>
 
 
-## Step 3: Log in to Claude Code
+## Step 3: Start Claude Code
 
 Once the setup script finishes, **close that Terminal window** and **open a new one** (so the new shell aliases are loaded).
-
-Log in to Claude Code:
-
-```bash
-claude auth login
-```
-
-This opens a browser sign-in flow for your Anthropic account. Follow the prompts to authenticate.
-
-Then generate a setup token for OpenClaw:
-
-```bash
-claude setup-token
-```
-
-This creates a long-lived token tied to your Claude subscription. **Copy the token** — you will paste it into Claude Code in the next step.
-
-What you should see:
-
-- `claude auth login` opens a sign-in page in your browser, then shows a success message
-- `claude setup-token` displays a token starting with `sk-ant-`. Copy it.
-
-## Step 4: Start Claude Code
-
-Now start Claude Code with full permissions:
 
 ```bash
 cd ~/projects/openclaw-setup
@@ -158,23 +133,25 @@ cc
 
 `cc` is a shell alias set up by the bootstrap script. It runs `claude --dangerously-skip-permissions`, which lets Claude Code read, write, and run commands without asking for approval on each one.
 
+Claude Code will open a browser sign-in flow on first launch. Follow the prompts to log in with your Anthropic account.
+
 What you should see:
 
-- Claude Code starts in the `openclaw-setup` directory
+- A sign-in page opens in your browser
+- After logging in, Claude Code starts in the `openclaw-setup` directory
 - A prompt where you can type instructions
 
-## Step 5: Set up OpenClaw
+## Step 4: Set up OpenClaw
 
-From here, Claude Code handles the rest. Tell it to set up OpenClaw and have your API keys ready.
-
-Tell Claude Code to set up OpenClaw and paste your setup token from Step 3 when it asks.
+From here, Claude Code handles the rest. Tell it to set up OpenClaw.
 
 Claude Code will:
 
-1. Run `openclaw onboard --non-interactive` with your setup token to configure the gateway, credentials, and workspace using your Claude subscription
-2. Install the gateway daemon
-3. Apply patches from this repo (`shared/patches/`) to configure agent defaults and plugins
-4. Verify the installation with `openclaw doctor`
+1. Generate a setup token for your Claude subscription
+2. Run `openclaw onboard --non-interactive` to configure the gateway, credentials, and workspace
+3. Install the gateway daemon
+4. Apply patches from this repo (`shared/patches/`) to configure agent defaults and plugins
+5. Verify the installation with `openclaw doctor`
 
 If you have chat channel tokens (Discord, Telegram, or Slack), give them to Claude Code and it will configure the right channel. If you do not have any yet, that is fine — you can add channels later.
 
