@@ -16,7 +16,7 @@ NODE_VERSION="24"
 
 # ── Homebrew Taps ─────────────────────────────────────────────────────────────
 TAPS=(
-  steipete/tap           # gogcli
+  steipete/tap           # gogcli, gifgrep, remindctl, bird, goplaces, mcporter, etc.
   # supabase/tap           # supabase CLI
   # tursodatabase/tap      # turso CLI
 )
@@ -38,6 +38,25 @@ FORMULAE=(
   uv                       # fast Python package manager
   wget                     # HTTP downloads
   steipete/tap/gogcli      # Google Workspace CLI
+  steipete/tap/gifgrep     # GIF search
+  steipete/tap/goplaces    # Google Places CLI
+  steipete/tap/mcporter    # MCP server CLI
+  steipete/tap/remindctl   # Apple Reminders CLI
+  steipete/tap/peekaboo    # macOS window inspector
+  steipete/tap/camsnap     # camera snapshot CLI
+  steipete/tap/blucli      # Bluetooth CLI
+  steipete/tap/imsg        # iMessage CLI
+  steipete/tap/oracle      # system info CLI
+  steipete/tap/sonoscli    # Sonos CLI
+  steipete/tap/discrawl    # Discord scraper
+  steipete/tap/poltergeist # ghost cursor automation
+  steipete/tap/sag         # Swift AST grep
+  steipete/tap/summarize   # text summarizer
+  steipete/tap/tmuxwatch   # tmux session watcher
+  steipete/tap/wacli       # WhatsApp CLI
+  steipete/tap/songsee     # Apple Music CLI
+  steipete/tap/spogo       # Spotify CLI
+  steipete/tap/ordercli    # order tracking CLI
 
   # Databases
   # postgresql@16
