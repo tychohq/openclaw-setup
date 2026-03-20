@@ -25,8 +25,13 @@ set_step() {
   CURRENT_STEP="$1"
 }
 
+cleanup_setup() {
+  [ -n "${ASKPASS_SCRIPT:-}" ] && rm -f "$ASKPASS_SCRIPT"
+}
+
 on_error() {
   local code=$?
+  cleanup_setup
   echo ""
   echo "❌ Setup stopped during: $CURRENT_STEP"
   echo "   Last command: $BASH_COMMAND"
@@ -34,6 +39,7 @@ on_error() {
   exit "$code"
 }
 
+trap cleanup_setup EXIT
 trap on_error ERR
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
@@ -191,6 +197,12 @@ ensure_sudo() {
   if [ -n "${SETUP_PASSWORD:-}" ]; then
     if echo "$SETUP_PASSWORD" | sudo -S true 2>/dev/null; then
       record_installed "sudo access (via SETUP_PASSWORD)"
+      # Create an askpass script so subprocesses (e.g. brew cask installs)
+      # that call sudo internally can authenticate without prompting.
+      ASKPASS_SCRIPT="$(mktemp)"
+      printf '#!/bin/sh\necho "%s"\n' "$SETUP_PASSWORD" > "$ASKPASS_SCRIPT"
+      chmod +x "$ASKPASS_SCRIPT"
+      export SUDO_ASKPASS="$ASKPASS_SCRIPT"
     else
       echo "❌ SETUP_PASSWORD is set but sudo authentication failed." >&2
       exit 1
