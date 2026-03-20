@@ -933,6 +933,22 @@ if [ "${APPLY_UPDATE_DEFAULTS:-false}" = true ]; then
     record_failed "updates: disable RSR auto-install" "defaults write failed"
 fi
 
+# ── 13e. Enable remote access (SSH + Screen Sharing) ─────────────────────────
+
+if [ "${APPLY_REMOTE_ACCESS:-false}" = true ]; then
+  echo ">>> Enabling remote access..."
+
+  # Enable Remote Login (SSH)
+  run_sudo systemsetup -setremotelogin on 2>/dev/null && \
+    record_installed "remote: SSH (Remote Login)" || \
+    record_failed "remote: SSH (Remote Login)" "systemsetup command failed"
+
+  # Enable Screen Sharing
+  run_sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null && \
+    record_installed "remote: Screen Sharing" || \
+    record_failed "remote: Screen Sharing" "launchctl command failed"
+fi
+
 # ── 14. Create directories ───────────────────────────────────────────────────
 set_step "creating directories"
 

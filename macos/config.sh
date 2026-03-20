@@ -162,6 +162,7 @@ APPLY_GLOBAL_DEFAULTS=true
 APPLY_SCREENSHOT_DEFAULTS=true
 APPLY_SLEEP_DEFAULTS=true          # Never sleep (always-on server mode)
 APPLY_UPDATE_DEFAULTS=true         # Disable ALL automatic software updates & restarts
+APPLY_REMOTE_ACCESS=true           # Enable SSH (Remote Login) and Screen Sharing
 
 # Dock settings (only if APPLY_DOCK_DEFAULTS=true)
 DOCK_AUTOHIDE=true
