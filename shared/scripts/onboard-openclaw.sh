@@ -70,6 +70,7 @@ ONBOARD_ARGS=(
   --token "$TOKEN"
   --token-provider anthropic
   --secret-input-mode ref
+  --gateway-bind tailnet
 )
 
 # Skip channels by default, add specific ones if provided
