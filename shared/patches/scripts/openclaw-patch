@@ -97,9 +97,22 @@ expand_env_vars() {
   echo "$result"
 }
 
+# Source the OpenClaw .env file so requires checks can see stored secrets
+_env_loaded=false
+load_openclaw_env() {
+  if ! $_env_loaded && [[ -f "$OPENCLAW_HOME/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$OPENCLAW_HOME/.env"
+    set +a
+    _env_loaded=true
+  fi
+}
+
 # Check that all required env vars are set; returns missing var names on failure
 check_requires() {
   local patch_file="$1"
+  load_openclaw_env
   local missing=()
   while IFS= read -r var; do
     [[ -z "$var" ]] && continue
