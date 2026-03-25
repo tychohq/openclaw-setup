@@ -33,6 +33,9 @@ CHECK_CLI_VERSIONS=true
 # ── Cron ──
 CHECK_CRON=true
 
+# ── Custom Plugins ──
+CHECK_PLUGINS=true
+
 # ── Context & Session Settings ──
 # Informational only — displays model, context pruning, compaction settings.
 CHECK_CONTEXT=true
