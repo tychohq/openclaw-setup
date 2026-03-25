@@ -27,16 +27,62 @@ _humanize_cron_schedule() {
 
     # cron: "cron <min> <hour> <dom> <month> <dow> @ <tz>..."
     if echo "$sched" | grep -qE '^cron '; then
-        local min_f hour_f dom_f
-        min_f=$(echo "$sched"  | awk '{print $2}')
-        hour_f=$(echo "$sched" | awk '{print $3}')
-        dom_f=$(echo "$sched"  | awk '{print $4}')
+        local min_f hour_f dom_f month_f dow_f
+        min_f=$(echo "$sched"   | awk '{print $2}')
+        hour_f=$(echo "$sched"  | awk '{print $3}')
+        dom_f=$(echo "$sched"   | awk '{print $4}')
+        month_f=$(echo "$sched" | awk '{print $5}')
+        dow_f=$(echo "$sched"   | awk '{print $6}')
+
+        # Helper: convert day-of-week field to human-readable day names
+        # Input: "0,1,2,3,4" or "5" or "6,0" etc.  Output: "Mon–Fri" or "Fridays" etc.
+        local dow_suffix=""
+        if [ -n "$dow_f" ] && [ "$dow_f" != "*" ]; then
+            # Map each dow number to a name
+            local _dow_names=""
+            local _dow_num
+            for _dow_num in $(echo "$dow_f" | tr ',' ' '); do
+                case "$_dow_num" in
+                    0) _dow_names="${_dow_names:+$_dow_names,}Sun" ;;
+                    1) _dow_names="${_dow_names:+$_dow_names,}Mon" ;;
+                    2) _dow_names="${_dow_names:+$_dow_names,}Tue" ;;
+                    3) _dow_names="${_dow_names:+$_dow_names,}Wed" ;;
+                    4) _dow_names="${_dow_names:+$_dow_names,}Thu" ;;
+                    5) _dow_names="${_dow_names:+$_dow_names,}Fri" ;;
+                    6) _dow_names="${_dow_names:+$_dow_names,}Sat" ;;
+                    7) _dow_names="${_dow_names:+$_dow_names,}Sun" ;;  # 7 = Sun in some cron impls
+                esac
+            done
+
+            local _dow_count
+            _dow_count=$(echo "$dow_f" | tr ',' '\n' | wc -l | tr -d ' ')
+
+            # Detect common ranges for compact display
+            if [ "$dow_f" = "0,1,2,3,4" ] || [ "$dow_f" = "1,2,3,4,5" ]; then
+                dow_suffix=" weekdays"
+            elif [ "$dow_f" = "0,6" ] || [ "$dow_f" = "6,0" ]; then
+                dow_suffix=" weekends"
+            elif [ "$_dow_count" -eq 1 ]; then
+                # Single day — use full plural name
+                case "$_dow_names" in
+                    Sun) dow_suffix=" Sundays" ;;
+                    Mon) dow_suffix=" Mondays" ;;
+                    Tue) dow_suffix=" Tuesdays" ;;
+                    Wed) dow_suffix=" Wednesdays" ;;
+                    Thu) dow_suffix=" Thursdays" ;;
+                    Fri) dow_suffix=" Fridays" ;;
+                    Sat) dow_suffix=" Saturdays" ;;
+                esac
+            else
+                dow_suffix=" ${_dow_names}"
+            fi
+        fi
 
         # Every N hours: */N
         if echo "$hour_f" | grep -qE '^\*/[0-9]+$'; then
             local n
             n=$(echo "$hour_f" | cut -d/ -f2)
-            echo "every ${n}h"
+            echo "every ${n}h${dow_suffix}"
             return
         fi
 
@@ -44,7 +90,7 @@ _humanize_cron_schedule() {
         if [ "$hour_f" = "*" ] && echo "$min_f" | grep -qE '^\*/[0-9]+$'; then
             local n
             n=$(echo "$min_f" | cut -d/ -f2)
-            echo "every ${n}min"
+            echo "every ${n}min${dow_suffix}"
             return
         fi
 
@@ -52,18 +98,26 @@ _humanize_cron_schedule() {
         if echo "$hour_f" | grep -qE '^[0-9]+(,[0-9]+)+$'; then
             local count
             count=$(echo "$hour_f" | tr ',' '\n' | wc -l | tr -d ' ')
-            echo "${count}x daily"
+            if [ -n "$dow_suffix" ]; then
+                echo "${count}x${dow_suffix}"
+            else
+                echo "${count}x daily"
+            fi
             return
         fi
 
         # Single specific hour
         if echo "$hour_f" | grep -qE '^[0-9]+$'; then
-            echo "daily"
+            if [ -n "$dow_suffix" ]; then
+                echo "${dow_suffix# }"
+            else
+                echo "daily"
+            fi
             return
         fi
 
         # Fallback
-        echo "scheduled"
+        echo "scheduled${dow_suffix}"
         return
     fi
 
