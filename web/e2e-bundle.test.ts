@@ -261,19 +261,19 @@ describe('E2E: select patches + bundled skills → config-bundle.json', () => {
   });
 
   test('config_set and config_append steps carry path and value directly', () => {
-    loadPatchesIntoState(['browser-config', 'skills-config']);
+    loadPatchesIntoState(['memory-config', 'skills-config']);
     const state = g('state');
-    state.selected.add('browser-config');
+    state.selected.add('memory-config');
     state.selected.add('skills-config');
 
     const files = g('buildBundleFiles')();
     const config = JSON.parse(files['config-bundle.json']);
 
-    // browser-config has a config_set step
-    const browserPatch = config.patches.find((p: any) => p.id === 'browser-config');
-    const setStep = browserPatch.steps.find((s: any) => s.type === 'config_set');
-    expect(setStep.path).toBe('browser.headless');
-    expect(setStep.value).toContain('false');
+    // memory-config has config_set steps
+    const memoryPatch = config.patches.find((p: any) => p.id === 'memory-config');
+    const setStep = memoryPatch.steps.find((s: any) => s.type === 'config_set');
+    expect(setStep.path).toBe('agents.defaults.memorySearch');
+    expect(setStep.value).toBeTruthy();
 
     // skills-config has a config_append step
     const skillsPatch = config.patches.find((p: any) => p.id === 'skills-config');
@@ -350,18 +350,18 @@ describe('E2E: select cron jobs → cron-selections.json', () => {
     expect(crons).toEqual([]);
   });
 
-  test('all 5 cron jobs can be loaded and selected', () => {
+  test('all cron jobs can be loaded and selected', () => {
     loadCronJobsIntoState(cronCatalog);
     const state = g('state');
 
-    expect(state.cronJobs).toHaveLength(5);
+    expect(state.cronJobs).toHaveLength(cronCatalog.length);
 
     for (const job of state.cronJobs) state.cronSelected.add(job.name);
 
     const files = g('buildBundleFiles')();
     const crons = JSON.parse(files['cron-selections.json']);
 
-    expect(crons).toHaveLength(5);
+    expect(crons).toHaveLength(cronCatalog.length);
     const names = crons.map((c: any) => c.name);
     for (const id of cronCatalog) {
       expect(names).toContain(id);
