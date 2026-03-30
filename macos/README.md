@@ -8,12 +8,62 @@ It is written for someone who may be brand new to Terminal.
 
 You will:
 
-1. Open Terminal
-2. Run one command that installs everything
-3. Log in to Claude Code
-4. Start Claude Code to continue setup
+1. Set up accounts you'll need (see below)
+2. Open Terminal
+3. Run one command that installs everything
+4. Log in to Claude Code
+5. Start Claude Code to continue setup
 
 If you want a guided setup companion while you work through these steps, open [confidants.dev](https://confidants.dev) before you start.
+
+## Before You Start: Account Setup
+
+You'll need accounts and API keys from several services. Do these first so you have everything ready when the setup script asks for them.
+
+### 1. Claude Pro or Max subscription
+
+Claude Code requires a paid Claude plan ($20/mo Pro or $100/mo Max).
+
+1. Go to [claude.ai/upgrade](https://claude.ai/upgrade)
+2. Create an account or log in
+3. Subscribe to **Pro** or **Max**
+
+### 2. OpenAI API key
+
+Used for Codex and GPT models.
+
+1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys) — create an account or log in
+2. Click **Create new secret key**, give it a name, and copy it immediately (it's only shown once)
+3. Add a payment method at [platform.openai.com/settings/organization/billing/overview](https://platform.openai.com/settings/organization/billing/overview) — add at least $10 in credits
+
+### 3. Gemini API key
+
+Used for image generation and Gemini models. Free tier, no credit card required.
+
+1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — sign in with your Google account
+2. Click **Create API key**, select a project (or let it create one), and copy the key
+
+### 4. Google Cloud OAuth credentials (for Gmail, Calendar, etc.)
+
+The `gog` CLI needs a GCP OAuth Desktop App to access Google Workspace APIs.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) — create a Google Cloud account if you don't have one
+2. Create a new project (or select an existing one)
+3. Go to [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients) in the left sidebar
+4. Click **Create client** → set Application type to **Desktop app** → give it a name → click **Create**
+5. Copy the **Client ID** and **Client Secret** from the confirmation dialog
+
+> If Google asks you to configure a consent screen first, go to [Google Auth Platform → Branding](https://console.cloud.google.com/auth/branding), fill in the required fields (app name, support email), then come back and create the client.
+
+### 5. Tailscale
+
+Used for secure remote access to your Mac mini from anywhere.
+
+1. The setup script installs Tailscale automatically
+2. After setup completes, open the **Tailscale** app from your Applications folder (or click the menu bar icon)
+3. Click **Log in** and sign in with Google, GitHub, Microsoft, or Apple
+
+---
 
 ## Step 1: Open Terminal
 
