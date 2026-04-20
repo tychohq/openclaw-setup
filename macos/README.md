@@ -82,10 +82,10 @@ What you should see:
 
 ## Step 2: Run the bootstrap command
 
-Replace `mypassword` with your Mac's admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
+Replace `***` with your Mac's admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
 
 ```bash
-SETUP_PASSWORD=mypassword curl -fsSL mac.brennerspear.com | bash
+SETUP_PASSWORD=*** curl -fsSL mac.brennerspear.com | bash
 ```
 
 This downloads and runs the bootstrap script, which:
@@ -95,9 +95,10 @@ This downloads and runs the bootstrap script, which:
 3. Installs **CLI tools**: `git`, `gh`, `tmux`, `uv`, `jq`, `fzf`, `ffmpeg`, and more
 4. Installs **apps**: Chrome, VS Code, Warp, Slack, Discord, 1Password, Raycast, Claude, and more
 5. Installs **Bun** and **Node.js 24**
-6. Applies **Mac settings**: Dock, Finder, dark mode, screenshots, sleep prevention
-7. Sets up **shell aliases** in `~/.zshrc` (including `cc` for Claude Code)
-8. Clones this repo to `~/projects/openclaw-setup`
+6. Installs **Codex CLI** (`@openai/codex`) globally
+7. Applies **Mac settings**: Dock, Finder, dark mode, screenshots, sleep prevention
+8. Sets up **shell aliases** in `~/.zshrc` (including `cc` for Claude Code and `cx` for Codex CLI)
+9. Clones this repo to `~/projects/openclaw-setup`
 
 macOS will show pop-ups asking to install developer tools or approve permissions. Click **Install** or **Allow** on any pop-ups that appear.
 
@@ -156,9 +157,10 @@ The live source of truth is [`macos/config.sh`](config.sh).
    1. Node.js 24 through `fnm`
    2. Bun
    3. Global Bun packages: `typescript`, `tsx`, `vercel`
-   4. Standard folders such as `~/projects` and `~/Documents/Screenshots`
-   5. Dock, Finder, global macOS, and screenshot defaults
-   6. Shell setup via `macos/scripts/setup-zshrc.sh`
+   4. Global npm packages: `typescript`, `tsx`, `vercel`, `@openai/codex` (Codex CLI)
+   5. Standard folders such as `~/projects` and `~/Documents/Screenshots`
+   6. Dock, Finder, global macOS, and screenshot defaults
+   7. Shell setup via `macos/scripts/setup-zshrc.sh` (adds `cc` for Claude Code and `cx` for Codex CLI)
 5. Optional things are available but not turned on by default:
    1. Editor extensions with `--with-extensions`
    2. OpenClaw globals and workspace bootstrap

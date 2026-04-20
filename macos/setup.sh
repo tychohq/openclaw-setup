@@ -26,7 +26,10 @@ set_step() {
 }
 
 cleanup_setup() {
-  [ -n "${ASKPASS_SCRIPT:-}" ] && rm -f "$ASKPASS_SCRIPT"
+  if [ -n "${ASKPASS_SCRIPT:-}" ]; then
+    rm -f "$ASKPASS_SCRIPT"
+  fi
+  return 0
 }
 
 on_error() {
@@ -1025,38 +1028,43 @@ echo "  3. Close this Terminal, open a new one, then:"
 echo "     cd ~/projects/openclaw-setup"
 echo "     cc"
 echo ""
-
 # ── Handoff to Claude Code ───────────────────────────────────────────────────
 
-if [ "$HANDOFF" = true ]; then
-  set_step "starting Claude Code handoff"
-  # Install Claude Code if not already present
-  if ! command -v claude &>/dev/null; then
-    echo ">>> Installing Claude Code for handoff..."
-    if curl -fsSL https://claude.ai/install.sh | bash 2>&1; then
-      export PATH="$HOME/.local/bin:$PATH"
-      record_installed "Claude Code (for handoff)"
-    else
-      echo "⚠️  Claude Code installation failed. Install manually:"
-      echo "    curl -fsSL https://claude.ai/install.sh | bash"
-      echo "    claude --dangerously-skip-permissions --prompt \"\$(cat $HANDOFF_PROMPT_FILE)\""
-    fi
+if [ "$HANDOFF" != true ]; then
+  # Avoid returning the falsey status from the final handoff guard when handoff
+  # is intentionally disabled (for CI or non-interactive runs).
+  exit 0
+fi
+
+set_step "starting Claude Code handoff"
+# Install Claude Code if not already present
+if ! command -v claude &>/dev/null; then
+  echo ">>> Installing Claude Code for handoff..."
+  if curl -fsSL https://claude.ai/install.sh | bash 2>&1; then
+    export PATH="$HOME/.local/bin:$PATH"
+    record_installed "Claude Code (for handoff)"
+  else
+    echo ""
+    echo "⚠️  Claude Code installation failed. Install manually:"
+    echo "    curl -fsSL https://claude.ai/install.sh | bash"
+    echo "    claude --dangerously-skip-permissions --prompt \"\$(cat $HANDOFF_PROMPT_FILE)\""
+  fi
+fi
+
+if command -v claude &>/dev/null; then
+  if [ ! -f "$HANDOFF_PROMPT_FILE" ]; then
+    record_failed "Claude Code handoff" "missing handoff prompt: $HANDOFF_PROMPT_FILE"
+    exit 1
   fi
 
-  if command -v claude &>/dev/null; then
-    if [ ! -f "$HANDOFF_PROMPT_FILE" ]; then
-      record_failed "Claude Code handoff" "missing handoff prompt: $HANDOFF_PROMPT_FILE"
-      exit 1
-    fi
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  Handing off to Claude Code to finish setup..."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
 
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  Handing off to Claude Code to finish setup..."
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-
-    # Write handoff context to a file Claude Code can read
-    HANDOFF_FILE="$SCRIPT_DIR/.handoff-context.md"
-    cat > "$HANDOFF_FILE" << HANDOFF_EOF
+  # Write handoff context to a file Claude Code can read
+  HANDOFF_FILE="$SCRIPT_DIR/.handoff-context.md"
+  cat > "$HANDOFF_FILE" << HANDOFF_EOF
 $(cat "$HANDOFF_PROMPT_FILE")
 
 ## What was installed
@@ -1073,18 +1081,20 @@ $(echo -e "$SKIPPED_CONFIG_ITEMS")
 $SCRIPT_DIR/config.sh — edit this to add/remove packages permanently
 HANDOFF_EOF
 
-    # Check if Claude is authenticated
-    if claude --version &>/dev/null && claude -p "say ok" &>/dev/null 2>&1; then
-      # Authenticated — launch with the handoff prompt
-      exec claude --dangerously-skip-permissions -p "Read $HANDOFF_FILE and follow its instructions. Start by checking what's already configured and ask what to tackle first."
-    else
-      # Not authenticated — launch interactively so user can log in
-      echo "  Claude Code needs authentication first."
-      echo "  After logging in, run:"
-      echo ""
-      echo "    claude -p \"Read $HANDOFF_FILE and follow its instructions.\""
-      echo ""
-      exec claude
-    fi
+  # Check if Claude is authenticated
+  if claude --version &>/dev/null && claude -p "say ok" &>/dev/null 2>&1; then
+    # Authenticated — launch with the handoff prompt
+    exec claude --dangerously-skip-permissions -p "Read $HANDOFF_FILE and follow its instructions. Start by checking what's already configured and ask what to tackle first."
+  else
+    # Not authenticated — launch interactively so user can log in
+    echo "  Claude Code needs authentication first."
+    echo "  After logging in, run:"
+    echo ""
+    echo "    claude -p \"Read $HANDOFF_FILE and follow its instructions.\""
+    echo ""
+    exec claude
   fi
 fi
+
+record_failed "Claude Code handoff" "handoff requested but Claude Code is unavailable"
+exit 1
