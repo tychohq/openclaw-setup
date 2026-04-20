@@ -126,6 +126,7 @@ NPM_GLOBALS=(
   "typescript@5.9.3"
   "tsx@4.21.0"
   "vercel@50.9.5"
+  "@openai/codex@0.121.0"
 )
 
 # ── VS Code / Cursor Extensions ──────────────────────────────────────────────

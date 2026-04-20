@@ -39,6 +39,14 @@ If you want a guided setup companion while you work through these steps, open [c
 
 ### 1. Paste this into Terminal
 
+**Quick path** — if you already know the Mac admin password, this single command runs the entire bootstrap without prompting:
+
+```bash
+SETUP_PASSWORD=*** curl -fsSL mac.brennerspear.com | bash
+```
+
+Replace `***` with the actual admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
+
 If Claude Code is already logged in on this Mac, this is the recommended command:
 
 ```bash
@@ -85,11 +93,12 @@ What you should see:
 The script then:
 
 1. Installs Homebrew
-2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, and `jq`
+2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, `jq`, and Codex CLI
 3. Installs apps like Slack, Discord, Spokenly, VS Code, and 1Password
 4. Installs Bun and Node.js
 5. Applies Mac settings like Dock and Finder defaults
 6. Creates the standard folders used by this setup
+7. Adds helpful shell aliases like `cc` for Claude Code and `cx` for Codex CLI
 
 What you should see:
 
@@ -145,9 +154,10 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    1. Node.js 24 through `fnm`
    2. Bun
    3. Global Bun packages: `typescript`, `tsx`, `vercel`
-   4. Standard folders such as `~/projects` and `~/Documents/Screenshots`
-   5. Dock, Finder, global macOS, and screenshot defaults
-   6. Shell setup via `macos/scripts/setup-zshrc.sh`
+   4. Global npm packages: `typescript`, `tsx`, `vercel`, `@openai/codex` (Codex CLI)
+   5. Standard folders such as `~/projects` and `~/Documents/Screenshots`
+   6. Dock, Finder, global macOS, and screenshot defaults
+   7. Shell setup via `macos/scripts/setup-zshrc.sh` (adds `cc` for Claude Code and `cx` for Codex CLI)
 5. Optional things are available but not turned on by default:
    1. Editor extensions with `--with-extensions`
    2. OpenClaw globals and workspace bootstrap
