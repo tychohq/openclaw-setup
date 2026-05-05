@@ -92,6 +92,7 @@ CASKS=(
   # AI
   # chatgpt
   # claude
+  codex-app                # Codex desktop app
   spokenly
 
   # Media

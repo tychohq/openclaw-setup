@@ -37,7 +37,7 @@ If you want to finish Hermes setup today, also gather:
 - At least one provider or API key for Hermes, such as OpenAI, Anthropic, OpenRouter, Gemini, or another provider supported by `hermes model`
 - Platform credentials if you want to connect Hermes to Discord, Telegram, Slack, or email
 - Your own user IDs for any chat apps you want to restrict access to
-- Optional but useful: Google Cloud OAuth Desktop App credentials if you want Hermes-adjacent Gmail, Calendar, Drive, or Docs tooling on this Mac later
+- Optional but useful: the Google account(s) you plan to connect later via **GOG** if you want Gmail, Calendar, Drive, or Docs access on this Mac. For Google Workspace access in this setup, prefer **GOG + gog-safety** over Hermes's built-in Gmail/email path.
 
 If you want a guided setup companion while you work through these steps, open [confidants.dev](https://confidants.dev) before you start.
 
@@ -80,7 +80,7 @@ curl -fsSL mac.brennerspear.com | bash
 What these commands do:
 
 - Download the starter script from GitHub
-- Install the shared Mac mini tooling and apps from this repo
+- Install the shared Mac mini tooling and apps from this repo, including the Codex desktop app
 - Install **Codex CLI** (`@openai/codex`) globally and add the `cx` shell alias
 - Optionally open Claude Code near the end if you used `--handoff`
 
@@ -291,9 +291,10 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    10. 1Password CLI
    11. Raycast
    12. Notion
-   13. Spokenly
-   14. Tailscale
-   15. Hack Nerd Font
+   13. Codex app (desktop)
+   14. Spokenly
+   15. Tailscale
+   16. Hack Nerd Font
 4. It also sets up:
    1. Node.js 24 through `fnm`
    2. Bun
@@ -486,19 +487,32 @@ Values commonly needed for Hermes:
 
 </details>
 
-## Optional: Email / Gmail
+## Optional: Google Workspace via GOG (preferred)
 
-Hermes also supports email.
+For Google access on this machine — Gmail, Calendar, Drive, Docs, Sheets, contacts, and similar workflows — **do not use Hermes's built-in Gmail/email adapter as the primary path**.
 
-If you want Hermes to have its own Gmail inbox, the Hermes email adapter can use Gmail through standard IMAP/SMTP with a **Gmail App Password**.
+For this setup, the preferred approach is:
 
-Important safety note:
+- Use **GOG** for Google Workspace operations
+- Use an appropriate **gog-safety** profile for the agent's permission level
+- Keep Google auth and Google-side access control in the GOG stack rather than wiring Gmail directly into Hermes
 
-- Use a **dedicated email account** for the agent
-- Do **not** use your main Gmail password
-- Turn on Google 2FA and create an **App Password** instead
+Practical rule of thumb:
 
-Hermes stores email credentials in `~/.hermes/.env`.
+- **L1 / L2 gog-safety** for drafting, inbox triage, research, and collaboration without send-level autonomy
+- **L3 gog-safety** only when you explicitly want broader write/send behavior
+
+If you want to authenticate a Google account for GOG on this machine, use GOG's own auth flow rather than Hermes email config.
+
+For example:
+
+```bash
+gog auth add <email> --remote
+```
+
+That keeps Google Workspace access aligned with the rest of the Tycho/Brenner toolchain.
+
+Hermes can still use Discord, Telegram, Slack, and other gateway platforms normally. If you ever choose to wire Hermes's own email adapter anyway, treat that as an exception path — not the default Google setup documented here.
 
 ## Troubleshooting
 
