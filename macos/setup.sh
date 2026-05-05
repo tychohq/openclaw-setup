@@ -189,10 +189,57 @@ print_summary() {
 
 run_sudo() {
   if [ -n "${SETUP_PASSWORD:-}" ]; then
-    echo "$SETUP_PASSWORD" | sudo -S "$@" 2>/dev/null
+    echo "$SETUP_PASSWORD" | sudo -S -p '' "$@"
   else
     sudo "$@"
   fi
+}
+
+enable_remote_login() {
+  local output
+  if output="$(run_sudo systemsetup -setremotelogin on 2>&1)"; then
+    record_installed "remote: SSH (Remote Login)"
+    return 0
+  fi
+
+  local systemsetup_code=$?
+  local systemsetup_output="$output"
+  local ssh_plist="/System/Library/LaunchDaemons/ssh.plist"
+
+  if [ ! -f "$ssh_plist" ]; then
+    record_failed "remote: SSH (Remote Login)" "systemsetup exit $systemsetup_code: $(reason_from_output "$systemsetup_output"); fallback unavailable: $ssh_plist not found"
+    printf '%s\n' "$systemsetup_output" | sed 's/^/    /'
+    return 1
+  fi
+
+  local fallback_output=""
+  local cmd_output
+  local fallback_success=false
+
+  cmd_output="$(run_sudo launchctl bootstrap system "$ssh_plist" 2>&1)" || true
+  fallback_output+="${cmd_output}"$'\n'
+
+  cmd_output="$(run_sudo launchctl enable system/com.openssh.sshd 2>&1)" || true
+  fallback_output+="${cmd_output}"$'\n'
+
+  if cmd_output="$(run_sudo launchctl kickstart -k system/com.openssh.sshd 2>&1)"; then
+    fallback_output+="${cmd_output}"$'\n'
+    fallback_success=true
+  else
+    fallback_output+="${cmd_output}"$'\n'
+  fi
+
+  if [ "$fallback_success" = true ]; then
+    record_installed "remote: SSH (Remote Login) via launchd fallback"
+    return 0
+  fi
+
+  record_failed "remote: SSH (Remote Login)" "systemsetup exit $systemsetup_code: $(reason_from_output "$systemsetup_output"); launchd fallback failed: $(reason_from_output "$fallback_output")"
+  {
+    printf '%s\n' "$systemsetup_output"
+    printf '%s\n' "$fallback_output"
+  } | sed 's/^/    /'
+  return 1
 }
 
 # Validate sudo access up front (and start keepalive if running standalone)
@@ -852,6 +899,7 @@ if [ "${APPLY_DOCK_DEFAULTS:-false}" = true ]; then
   run_cmd "dock: autohide" defaults write com.apple.dock autohide -bool "${DOCK_AUTOHIDE:-true}" || true
   run_cmd "dock: orientation" defaults write com.apple.dock orientation -string "${DOCK_ORIENTATION:-right}" || true
   run_cmd "dock: tilesize" defaults write com.apple.dock tilesize -int "${DOCK_TILESIZE:-43}" || true
+  run_cmd "dock: largesize" defaults write com.apple.dock largesize -int "${DOCK_LARGESIZE:-56}" || true
   run_cmd "dock: magnification" defaults write com.apple.dock magnification -bool "${DOCK_MAGNIFICATION:-true}" || true
   run_cmd "dock: show-recents" defaults write com.apple.dock show-recents -bool "${DOCK_SHOW_RECENTS:-false}" || true
   run_cmd "dock: no launch animation" defaults write com.apple.dock launchanim -bool false || true
@@ -942,9 +990,7 @@ if [ "${APPLY_REMOTE_ACCESS:-false}" = true ]; then
   echo ">>> Enabling remote access..."
 
   # Enable Remote Login (SSH)
-  run_sudo systemsetup -setremotelogin on 2>/dev/null && \
-    record_installed "remote: SSH (Remote Login)" || \
-    record_failed "remote: SSH (Remote Login)" "systemsetup command failed"
+  enable_remote_login || true
 
   # Enable Screen Sharing
   run_sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null && \
@@ -986,7 +1032,10 @@ done
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 
-print_summary
+set_step "summarizing setup results"
+if ! print_summary; then
+  exit 1
+fi
 
 # ── Generate handoff context ──────────────────────────────────────────────────
 # Extract commented-out items from config so Claude Code knows what's available

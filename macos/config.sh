@@ -174,6 +174,7 @@ APPLY_REMOTE_ACCESS=true           # Enable SSH (Remote Login) and Screen Sharin
 DOCK_AUTOHIDE=true
 DOCK_ORIENTATION="right"       # left, bottom, right
 DOCK_TILESIZE=43
+DOCK_LARGESIZE=56
 DOCK_MAGNIFICATION=true
 DOCK_SHOW_RECENTS=false
 DOCK_CLEAR_DEFAULT=true        # Remove all default dock items (Maps, Photos, etc.)
