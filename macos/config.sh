@@ -102,6 +102,7 @@ CASKS=(
 
   # System
   tailscale
+  parsec                    # remote desktop
   # mullvad-vpn
   # google-drive
   # karabiner-elements

@@ -95,7 +95,7 @@ The script then:
 
 1. Installs Homebrew
 2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, `jq`, and Codex CLI
-3. Installs apps like Slack, Discord, Codex app, Spokenly, VS Code, and 1Password
+3. Installs apps like Slack, Discord, Codex app, Spokenly, VS Code, 1Password, and Parsec
 4. Installs Bun and Node.js
 5. Applies Mac settings like Dock and Finder defaults
 6. Creates the standard folders used by this setup
@@ -151,7 +151,8 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    13. Codex app (desktop)
    14. Spokenly
    15. Tailscale
-   16. Hack Nerd Font
+   16. Parsec
+   17. Hack Nerd Font
 4. It also sets up:
    1. Node.js 24 through `fnm`
    2. Bun
