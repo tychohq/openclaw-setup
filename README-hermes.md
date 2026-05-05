@@ -52,10 +52,11 @@ This step is still the same general Mac setup used elsewhere in this repo. It in
 **Quick path** — if you already know the Mac admin password, this single command runs the entire bootstrap without prompting:
 
 ```bash
-SETUP_PASSWORD=*** curl -fsSL mac.brennerspear.com | bash
+curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=*** bash
 ```
 
 Replace `***` with the actual admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
+The environment variable has to be applied to `bash`, not to `curl`, so the bootstrap script receives it.
 
 If Claude Code is already logged in on this Mac, this is the recommended command:
 
@@ -72,8 +73,8 @@ curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/b
 Short aliases for the same flows:
 
 ```bash
-SETUP_PASSWORD=mypassword curl -fsSL mac.brennerspear.com | bash
-curl -fsSL mac.brennerspear.com | bash -s -- --handoff
+curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypassword bash
+curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypassword bash -s -- --handoff
 curl -fsSL mac.brennerspear.com | bash
 ```
 

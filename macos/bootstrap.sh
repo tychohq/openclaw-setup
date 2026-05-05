@@ -7,7 +7,8 @@ set -euo pipefail
 # curl -fsSL mac.brennerspear.com | bash -s -- --handoff   # hand off to Claude Code after
 #
 # Non-interactive (password via env):
-# SETUP_PASSWORD=mypass curl -fsSL mac.brennerspear.com | bash
+# curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypass bash
+# curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypass bash -s -- --handoff
 # =============================================================================
 
 REPO_URL="https://github.com/tychohq/openclaw-setup.git"
