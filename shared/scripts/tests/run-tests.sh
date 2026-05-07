@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 UPGRADE_SCRIPT="$ROOT_DIR/shared/scripts/openclaw-upgrade"
+BOOTSTRAP_SCRIPT="$ROOT_DIR/shared/scripts/bootstrap-openclaw-workspace.sh"
+SETUP_SCRIPT="$ROOT_DIR/shared/scripts/setup-openclaw.sh"
 ORIG_PATH="$PATH"
 CURRENT_SCENARIO=""
 
@@ -215,7 +217,71 @@ test_backup_restore() {
   rm -rf "$base"
 }
 
+test_bootstrap_deploys_checklist() {
+  local base home_dir checklist_dir rc
+  base="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-bootstrap-tests.XXXXXX")"
+  home_dir="$base/home"
+  checklist_dir="$home_dir/.openclaw/checklist"
+  mkdir -p "$home_dir"
+
+  rc=0
+  HOME="$home_dir" "$BOOTSTRAP_SCRIPT" --skip-cron --skip-skills >/dev/null 2>&1 || rc=$?
+  assert_eq "$rc" "0" "bootstrap should deploy checklist"
+  assert_exists "$checklist_dir/checklist.sh" "checklist.sh should be deployed"
+  assert_exists "$checklist_dir/run-and-save.sh" "run-and-save.sh should be deployed"
+  [[ -x "$checklist_dir/checklist.sh" ]] || fail "checklist.sh should be executable"
+  [[ -x "$checklist_dir/run-and-save.sh" ]] || fail "run-and-save.sh should be executable"
+  assert_exists "$checklist_dir/runs" "checklist runs dir should be created"
+  assert_exists "$checklist_dir/checklist.conf" "default checklist.conf should be created"
+
+  printf 'CUSTOM_CHECKLIST_CONF=1\n' > "$checklist_dir/checklist.conf"
+  rc=0
+  HOME="$home_dir" "$BOOTSTRAP_SCRIPT" --skip-cron --skip-skills >/dev/null 2>&1 || rc=$?
+  assert_eq "$rc" "0" "bootstrap should be idempotent"
+  assert_file_contains "$checklist_dir/checklist.conf" "CUSTOM_CHECKLIST_CONF=1" "existing checklist.conf should be preserved"
+
+  pass "bootstrap deploys checklist"
+  rm -rf "$base"
+}
+
+test_setup_check_reports_missing_daily_health_runner() {
+  local base scenario bin_dir home_dir openclaw_dir output_file rc output
+  base="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-setup-check-tests.XXXXXX")"
+  scenario="$base/scenario"
+  bin_dir="$scenario/bin"
+  home_dir="$base/home"
+  openclaw_dir="$home_dir/.openclaw"
+  mkdir -p "$scenario" "$home_dir" "$openclaw_dir/workspace/cron-jobs"
+  create_stub_bin "$bin_dir"
+
+  cat > "$openclaw_dir/openclaw.json" <<'JSON'
+{"channels":{},"gateway":{},"agents":{}}
+JSON
+  printf 'ANTHROPIC_API_KEY=test\nOPENAI_API_KEY=test\n' > "$openclaw_dir/.env"
+  cp "$ROOT_DIR/shared/cron-jobs/daily-health-check.json" "$openclaw_dir/workspace/cron-jobs/daily-health-check.json"
+
+  output_file="$(mktemp "${TMPDIR:-/tmp}/openclaw-setup-check-output.XXXXXX")"
+  rc=0
+  (
+    export HOME="$home_dir"
+    export OPENCLAW_TEST_SCENARIO="$scenario"
+    export OPENCLAW_HOME="$openclaw_dir"
+    export PATH="$bin_dir:$ORIG_PATH"
+    "$SETUP_SCRIPT" --check
+  ) >"$output_file" 2>&1 || rc=$?
+  output="$(cat "$output_file")"
+  rm -f "$output_file"
+
+  assert_eq "$rc" "1" "setup --check should fail when daily health runner is missing"
+  printf '%s' "$output" | grep -F "Checklist save runner missing or not executable" >/dev/null || fail "setup --check should report missing run-and-save.sh"
+
+  pass "setup check reports missing daily health runner"
+  rm -rf "$base"
+}
+
 main() {
+  test_bootstrap_deploys_checklist
+  test_setup_check_reports_missing_daily_health_runner
   test_dry_run
   test_lock_behavior
   test_backup_restore

@@ -419,17 +419,28 @@ if [ -d "$CHECKLIST_SRC" ]; then
   if [ -d "$CHECKLIST_DEST" ]; then
     log "  Checklist already deployed — updating."
   fi
-  cp -r "$CHECKLIST_SRC" "$CHECKLIST_DEST"
-  mkdir -p "$CHECKLIST_DEST/runs"
-  log "  Checklist scripts deployed to $CHECKLIST_DEST"
+  mkdir -p "$CHECKLIST_DEST"
 
-  # Create default config if none exists
-  if [ ! -f "$CHECKLIST_CONF" ]; then
+  EXISTING_CHECKLIST_CONF=""
+  if [ -f "$CHECKLIST_CONF" ]; then
+    EXISTING_CHECKLIST_CONF="$(mktemp)"
+    cp "$CHECKLIST_CONF" "$EXISTING_CHECKLIST_CONF"
+  fi
+
+  cp -R "$CHECKLIST_SRC"/. "$CHECKLIST_DEST"/
+
+  if [ -n "$EXISTING_CHECKLIST_CONF" ]; then
+    cp "$EXISTING_CHECKLIST_CONF" "$CHECKLIST_CONF"
+    rm -f "$EXISTING_CHECKLIST_CONF"
+    log "  checklist.conf already exists — keeping."
+  elif [ -f "$CHECKLIST_DEST/checklist.conf.example" ]; then
     cp "$CHECKLIST_DEST/checklist.conf.example" "$CHECKLIST_CONF"
     log "  Created default checklist.conf"
-  else
-    log "  checklist.conf already exists — keeping."
   fi
+
+  mkdir -p "$CHECKLIST_DEST/runs"
+  chmod u+x "$CHECKLIST_DEST/checklist.sh" "$CHECKLIST_DEST/lib.sh" "$CHECKLIST_DEST/run-and-save.sh" 2>/dev/null || true
+  log "  Checklist scripts deployed to $CHECKLIST_DEST"
 else
   log "  Checklist source not found at $CHECKLIST_SRC — skipping."
 fi
