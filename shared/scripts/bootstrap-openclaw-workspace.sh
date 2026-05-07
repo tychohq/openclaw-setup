@@ -203,7 +203,50 @@ else
   skip "Create it with skill subdirectories (each with SKILL.md)"
 fi
 
-# ── 5. Create cron jobs ──────────────────────────────────────────────────────
+# ── 5. Install deployment health checklist ───────────────────────────────────
+
+# The daily-health-check cron template runs ~/.openclaw/checklist/run-and-save.sh.
+# AWS setup already deploys shared/checklist; keep the shared/macOS bootstrap path
+# in sync so local Mac installs do not end up with a cron job but no runner.
+echo ""
+echo ">>> Installing deployment health checklist..."
+
+CHECKLIST_SRC="$SHARED_DIR/checklist"
+CHECKLIST_DEST="$OPENCLAW_DIR/checklist"
+CHECKLIST_CONF="$CHECKLIST_DEST/checklist.conf"
+
+if [ ! -d "$CHECKLIST_SRC" ]; then
+  skip "No checklist/ directory in repo — skipping health checklist install"
+else
+  if [ "$DRY_RUN" = true ]; then
+    echo "  [dry-run] copy $CHECKLIST_SRC to $CHECKLIST_DEST"
+    echo "  [dry-run] preserve existing $CHECKLIST_CONF if present"
+    echo "  [dry-run] mkdir -p $CHECKLIST_DEST/runs"
+  else
+    mkdir -p "$CHECKLIST_DEST"
+    existing_conf=""
+    if [ -f "$CHECKLIST_CONF" ]; then
+      existing_conf="$(mktemp "${TMPDIR:-/tmp}/openclaw-checklist-conf.XXXXXX")"
+      cp -p "$CHECKLIST_CONF" "$existing_conf"
+    fi
+
+    cp -pR "$CHECKLIST_SRC"/. "$CHECKLIST_DEST"/
+
+    if [ -n "$existing_conf" ]; then
+      cp -p "$existing_conf" "$CHECKLIST_CONF"
+      rm -f "$existing_conf"
+      skip "preserved existing checklist.conf"
+    elif [ -f "$CHECKLIST_DEST/checklist.conf.example" ]; then
+      cp -p "$CHECKLIST_DEST/checklist.conf.example" "$CHECKLIST_CONF"
+      ok "created default checklist.conf"
+    fi
+
+    mkdir -p "$CHECKLIST_DEST/runs"
+    ok "health checklist installed to $CHECKLIST_DEST"
+  fi
+fi
+
+# ── 6. Create cron jobs ──────────────────────────────────────────────────────
 
 if [ "$SKIP_CRON" = false ]; then
   echo ""

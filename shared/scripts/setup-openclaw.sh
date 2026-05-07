@@ -140,6 +140,36 @@ if [ "$CHECK_ONLY" = true ]; then
     warn "Auth profiles missing: $AUTH_PROFILES_PATH"
   fi
 
+  DAILY_HEALTH_CRON="$OPENCLAW_DIR/workspace/cron-jobs/daily-health-check.json"
+  CHECKLIST_DIR="$OPENCLAW_DIR/checklist"
+  CHECKLIST_SCRIPT="$CHECKLIST_DIR/checklist.sh"
+  CHECKLIST_RUNNER="$CHECKLIST_DIR/run-and-save.sh"
+  CHECKLIST_RUNS="$CHECKLIST_DIR/runs"
+  if [ -f "$DAILY_HEALTH_CRON" ]; then
+    ok "Daily health check cron exists: $DAILY_HEALTH_CRON"
+
+    if [ -x "$CHECKLIST_SCRIPT" ]; then
+      ok "  Checklist script exists: $CHECKLIST_SCRIPT"
+    else
+      fail "  Checklist script missing or not executable: $CHECKLIST_SCRIPT"
+      errors=$((errors + 1))
+    fi
+
+    if [ -x "$CHECKLIST_RUNNER" ]; then
+      ok "  Checklist save runner exists: $CHECKLIST_RUNNER"
+    else
+      fail "  Checklist save runner missing or not executable: $CHECKLIST_RUNNER"
+      errors=$((errors + 1))
+    fi
+
+    if [ -d "$CHECKLIST_RUNS" ]; then
+      ok "  Checklist runs dir exists: $CHECKLIST_RUNS"
+    else
+      fail "  Checklist runs dir missing: $CHECKLIST_RUNS"
+      errors=$((errors + 1))
+    fi
+  fi
+
   if openclaw gateway status &>/dev/null; then
     ok "Gateway is running"
   else
