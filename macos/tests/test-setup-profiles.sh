@@ -43,6 +43,9 @@ make_stub() {
 create_stubs() {
   local bin_dir="$1"
   mkdir -p "$bin_dir"
+  # The dispatcher cannot use env bash: that would recurse into itself.
+  printf '%s\n' '#!/bin/sh' 'exec "${MACOS_TEST_BASH:?}" "$@"' > "$bin_dir/bash"
+  chmod +x "$bin_dir/bash"
 
   make_stub "$bin_dir" uname \
     'case "${1:-}" in -s) echo Darwin ;; -m) echo arm64 ;; *) echo Darwin ;; esac'
@@ -267,13 +270,53 @@ test_bootstrap_safe_modes() {
   assert_contains "$base/dry-run" 'Setup arguments: --dry-run --technical --with-extensions' "dry-run should show forwarded arguments"
   assert_contains "$LAPTOP_BOOTSTRAP" 'git -C "$CLONE_DIR" fetch --depth=1 origin "$REPO_REF"' "bootstrap should fetch the explicit ref"
   assert_contains "$LAPTOP_BOOTSTRAP" 'rev-parse --verify FETCH_HEAD^{commit}' "bootstrap should resolve the fetched ref to a commit"
-  assert_contains "$LAPTOP_BOOTSTRAP" '"${SETUP_ARGS[@]}" --config "$RUN_DIR/macos/config-laptop.sh"' "bootstrap should forward arguments while forcing laptop config"
+  assert_contains "$LAPTOP_BOOTSTRAP" '"$@" --config "$RUN_DIR/macos/config-laptop.sh"' "bootstrap should forward arguments while forcing laptop config"
   pass "bootstrap safe help/dry-run and ref handling"
 }
 
+test_stdin_bootstrap() {
+  local mode base bin rc
+  for mode in no-args --technical --help --dry-run; do
+    base="$TEST_TMP/stdin-$mode"
+    bin="$base/bin"
+    mkdir -p "$base/home" "$bin"
+    create_stubs "$bin"
+    : > "$base/calls"
+    make_stub "$bin" git \
+      'printf "git %s\n" "$*" >> "$MACOS_TEST_CALLS"' \
+      'case "${3:-}" in' \
+      '  rev-parse) echo 0123456789abcdef0123456789abcdef01234567 ;;' \
+      '  archive) tar -c -C "$MACOS_TEST_ROOT" macos ;;' \
+      'esac'
+    rc=0
+    (
+      export HOME="$base/home" TMPDIR="$TEST_TMP" MACOS_TEST_CALLS="$base/calls"
+      export MACOS_SETUP_BREW_BIN="$bin/brew" PATH="$bin:$ORIGINAL_PATH"
+      export MACOS_TEST_ROOT="$ROOT_DIR" OPENCLAW_SETUP_CLONE_DIR="$base/cache"
+      unset SETUP_PASSWORD ZDOTDIR BASH_ENV ENV
+      if [ "$mode" = no-args ]; then
+        cat "$LAPTOP_BOOTSTRAP" | "$MACOS_TEST_BASH"
+      else
+        cat "$LAPTOP_BOOTSTRAP" | "$MACOS_TEST_BASH" -s -- "$mode"
+      fi
+    ) > "$base/output" 2>&1 || rc=$?
+    cat "$base/output"
+    [ "$rc" -eq 0 ] || fail "stdin bootstrap $mode exited $rc ($MACOS_TEST_BASH)"
+    case "$mode" in
+      no-args|--technical)
+        assert_contains "$base/output" 'Setup complete with no failures.' 'real downstream setup must complete'
+        assert_contains "$base/calls" 'npm install -g @openai/codex@' 'real downstream must install mocked Codex'
+        ;;
+    esac
+    pass "stdin bootstrap $mode ($MACOS_TEST_BASH)"
+  done
+}
+
 main() {
+  export MACOS_TEST_BASH="${MACOS_TEST_BASH:-$BASH}"
   TEST_TMP="$(mktemp -d "${TMPDIR:-/tmp}/macos-profile-tests.XXXXXX")"
   trap 'rm -rf "$TEST_TMP"' EXIT
+  test_stdin_bootstrap
   test_laptop_default
   test_laptop_technical
   test_legacy_mini_profile

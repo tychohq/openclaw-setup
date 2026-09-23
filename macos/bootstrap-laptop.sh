@@ -10,7 +10,8 @@ CLONE_DIR="${OPENCLAW_SETUP_CLONE_DIR:-$HOME/projects/openclaw-setup-laptop}"
 CURRENT_STEP="starting"
 SUDO_KEEPALIVE_PID=""
 RUN_DIR=""
-SETUP_ARGS=("$@")
+# Arguments are never shifted: forward "$@" directly. Empty array expansion
+# under nounset fails on the Bash 3.2 shipped with macOS.
 
 print_usage() {
   cat <<'EOF'
@@ -80,7 +81,7 @@ if [ "$DRY_RUN" = true ]; then
   echo "  Ref:        $REPO_REF"
   echo "  Cache:      $CLONE_DIR"
   printf '  Setup arguments:'
-  printf ' %s' "${SETUP_ARGS[@]}"
+  printf ' %s' "$@"
   echo ""
   echo "  Profile:    macos/config-laptop.sh"
   echo ""
@@ -210,4 +211,4 @@ ok "Resolved $REPO_REF to $RESOLVED_COMMIT"
 ok "Existing checkout contents were not changed"
 
 step "Starting the Mac laptop setup"
-bash "$RUN_DIR/macos/setup.sh" "${SETUP_ARGS[@]}" --config "$RUN_DIR/macos/config-laptop.sh"
+bash "$RUN_DIR/macos/setup.sh" "$@" --config "$RUN_DIR/macos/config-laptop.sh"
