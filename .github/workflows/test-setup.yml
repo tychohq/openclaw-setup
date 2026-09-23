@@ -14,6 +14,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  test-installer-profiles:
+    name: Installer profiles (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test laptop and Mini profiles
+        run: bash macos/tests/test-setup-profiles.sh
+
   test-bootstrap:
     name: Bootstrap + Setup (macOS)
     runs-on: macos-15

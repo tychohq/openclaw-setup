@@ -52,7 +52,7 @@ This step is still the same general Mac setup used elsewhere in this repo. It in
 **Quick path** — if you already know the Mac admin password, this single command runs the entire bootstrap without prompting:
 
 ```bash
-curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=*** bash
+curl -fsSL mac-mini.brennerspear.com | SETUP_PASSWORD=*** bash
 ```
 
 Replace `***` with the actual admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
@@ -73,15 +73,15 @@ curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/b
 Short aliases for the same flows:
 
 ```bash
-curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypassword bash
-curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=mypassword bash -s -- --handoff
-curl -fsSL mac.brennerspear.com | bash
+curl -fsSL mac-mini.brennerspear.com | SETUP_PASSWORD=mypassword bash
+curl -fsSL mac-mini.brennerspear.com | SETUP_PASSWORD=mypassword bash -s -- --handoff
+curl -fsSL mac-mini.brennerspear.com | bash
 ```
 
 What these commands do:
 
 - Download the starter script from GitHub
-- Install the shared Mac mini tooling and apps from this repo, including the Codex desktop app
+- Install the shared Mac mini tooling and apps from this repo, including the ChatGPT desktop app
 - Install **Codex CLI** (`@openai/codex`) globally and add the `cx` shell alias
 - Optionally open Claude Code near the end if you used `--handoff`
 
@@ -292,7 +292,7 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    10. 1Password CLI
    11. Raycast
    12. Notion
-   13. Codex app (desktop)
+   13. ChatGPT (desktop)
    14. Spokenly
    15. Tailscale
    16. Parsec

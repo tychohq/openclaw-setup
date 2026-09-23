@@ -1,6 +1,6 @@
 # openclaw-setup
 
-This repo helps you set up **OpenClaw on a Mac mini**. It also contains AWS files, but this README is written for the **Mac mini path first**.
+This repo helps you set up **OpenClaw on a Mac mini**. It also contains AWS files and a separate laptop profile. See [macOS setup profiles](macos/README.md) for the laptop installer; this guide remains the **Mac mini path**.
 
 If you have never used the command line before, start here.
 
@@ -42,7 +42,7 @@ If you want a guided setup companion while you work through these steps, open [c
 **Quick path** — if you already know the Mac admin password, this single command runs the entire bootstrap without prompting:
 
 ```bash
-curl -fsSL mac.brennerspear.com | SETUP_PASSWORD=*** bash
+curl -fsSL mac-mini.brennerspear.com | SETUP_PASSWORD=*** bash
 ```
 
 Replace `***` with the actual admin password. On a fresh Mac mini this is the simple password you set during initial macOS setup.
@@ -76,8 +76,8 @@ curl -fsSL https://raw.githubusercontent.com/tychohq/openclaw-setup/main/macos/b
 Short aliases for the same flows:
 
 ```bash
-curl -fsSL mac.brennerspear.com | bash -s -- --handoff
-curl -fsSL mac.brennerspear.com | bash
+curl -fsSL mac-mini.brennerspear.com | bash -s -- --handoff
+curl -fsSL mac-mini.brennerspear.com | bash
 ```
 
 ### 2. If macOS asks to install Apple Command Line Tools, click Install
@@ -95,7 +95,7 @@ The script then:
 
 1. Installs Homebrew
 2. Installs command-line tools like `git`, `gh`, `tmux`, `uv`, `jq`, and Codex CLI
-3. Installs apps like Slack, Discord, Codex app, Spokenly, VS Code, 1Password, and Parsec
+3. Installs apps like Slack, Discord, ChatGPT, Spokenly, VS Code, 1Password, and Parsec
 4. Installs Bun and Node.js
 5. Applies Mac settings like Dock and Finder defaults
 6. Creates the standard folders used by this setup
@@ -148,7 +148,7 @@ The live source of truth is [`macos/config.sh`](macos/config.sh).
    10. 1Password CLI
    11. Raycast
    12. Notion
-   13. Codex app (desktop)
+   13. ChatGPT (desktop)
    14. Spokenly
    15. Tailscale
    16. Parsec
