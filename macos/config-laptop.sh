@@ -45,9 +45,7 @@ if [ "${TECHNICAL:-false}" = true ]; then
     jq
     tmux
     wget
-    steipete/tap/gogcli
     steipete/tap/gifgrep
-    steipete/tap/goplaces
     steipete/tap/remindctl
   )
   CASKS+=(

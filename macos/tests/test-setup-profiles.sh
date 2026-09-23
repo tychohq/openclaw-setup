@@ -201,6 +201,9 @@ test_laptop_technical() {
   for expected in typescript tsx vercel; do
     assert_contains "$calls" "npm install -g $expected@" "technical laptop should install npm $expected"
   done
+  for expected in steipete/tap/gogcli steipete/tap/goplaces; do
+    assert_not_contains "$calls" "brew install $expected" "technical laptop should omit $expected"
+  done
   for expected in 'defaults ' 'pmset ' 'systemsetup ' 'launchctl ' 'killall ' 'git config' 'openclaw'; do
     assert_not_contains "$calls" "$expected" "technical laptop should not perform prohibited write: $expected"
   done
