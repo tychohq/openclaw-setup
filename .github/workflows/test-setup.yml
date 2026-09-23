@@ -14,6 +14,34 @@ on:
   workflow_dispatch:
 
 jobs:
+  test-installer-profiles:
+    name: Installer profiles (${{ matrix.bash }}, mocked)
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        bash: [system-3.2, modern]
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install modern Bash for compatibility tests
+        if: matrix.bash == 'modern'
+        run: brew install bash
+
+      - name: Test laptop and Mini profiles
+        env:
+          BASH_VARIANT: ${{ matrix.bash }}
+        run: |
+          if [ "$BASH_VARIANT" = system-3.2 ]; then
+            TEST_BASH=/bin/bash
+          else
+            TEST_BASH="$(brew --prefix)/bin/bash"
+          fi
+          "$TEST_BASH" --version
+          /bin/bash macos/tests/run-sandboxed.sh "$TEST_BASH"
+
   test-bootstrap:
     name: Bootstrap + Setup (macOS)
     runs-on: macos-15

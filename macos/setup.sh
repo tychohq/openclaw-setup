@@ -56,6 +56,7 @@ Options:
   --extensions-only   Install only editor extensions and exit
   --with-extensions   Include editor extensions in full setup
   --skip-extensions   Skip editor extensions (default)
+  --technical         Include profile-specific technical tools
   --config FILE       Use a custom config file (default: config.sh)
   --handoff           Launch Claude Code after setup to finish interactively
   --no-handoff        Skip Claude Code handoff
@@ -67,6 +68,7 @@ DRY_RUN=false
 EXTENSIONS_ONLY=false
 SKIP_EXTENSIONS=true
 HANDOFF=false
+TECHNICAL=false
 CONFIG_FILE="$SCRIPT_DIR/config.sh"
 
 while [ "$#" -gt 0 ]; do
@@ -75,6 +77,7 @@ while [ "$#" -gt 0 ]; do
     --extensions-only) EXTENSIONS_ONLY=true ;;
     --with-extensions) SKIP_EXTENSIONS=false ;;
     --skip-extensions) SKIP_EXTENSIONS=true ;;
+    --technical)       TECHNICAL=true ;;
     --handoff)        HANDOFF=true ;;
     --no-handoff)     HANDOFF=false ;;
     --config)         shift; CONFIG_FILE="$1" ;;
@@ -99,6 +102,13 @@ fi
 
 # shellcheck source=config.sh
 source "$CONFIG_FILE"
+
+SETUP_PROFILE_NAME="${SETUP_PROFILE_NAME:-Mac Mini}"
+
+if [ "$HANDOFF" = true ] && [ "${ALLOW_HANDOFF:-true}" != true ]; then
+  echo "The ${SETUP_PROFILE_NAME} profile does not support --handoff." >&2
+  exit 1
+fi
 
 # ── Platform checks ──────────────────────────────────────────────────────────
 
@@ -268,6 +278,10 @@ ensure_sudo() {
 # ── Brew helpers ─────────────────────────────────────────────────────────────
 
 set_brew_env() {
+  if [ -n "${MACOS_SETUP_BREW_BIN:-}" ]; then
+    eval "$("$MACOS_SETUP_BREW_BIN" shellenv)"
+    return 0
+  fi
   if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
     return 0
@@ -473,7 +487,7 @@ fi
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
-echo "║          Mac Mini Setup — Full Run           ║"
+printf '║          %-30s ║\n' "${SETUP_PROFILE_NAME} Setup — Full Run"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
@@ -588,22 +602,24 @@ done
 
 # ── 5b. CLI symlinks for GUI apps ────────────────────────────────────────────
 
-# Sublime Text → subl
-SUBL_BIN="/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl"
-if [ -f "$SUBL_BIN" ] && ! command -v subl &>/dev/null; then
-  ln -sf "$SUBL_BIN" /usr/local/bin/subl 2>/dev/null || run_sudo ln -sf "$SUBL_BIN" /usr/local/bin/subl
-  record_installed "subl symlink"
-elif command -v subl &>/dev/null; then
-  record_skipped "subl symlink" "already available"
-fi
+if [ "${INSTALL_GUI_CLI_SYMLINKS:-true}" = true ]; then
+  # Sublime Text → subl
+  SUBL_BIN="/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl"
+  if [ -f "$SUBL_BIN" ] && ! command -v subl &>/dev/null; then
+    ln -sf "$SUBL_BIN" /usr/local/bin/subl 2>/dev/null || run_sudo ln -sf "$SUBL_BIN" /usr/local/bin/subl
+    record_installed "subl symlink"
+  elif command -v subl &>/dev/null; then
+    record_skipped "subl symlink" "already available"
+  fi
 
-# VS Code → code (usually handled by VS Code itself, but ensure it)
-VSCODE_BIN="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
-if [ -f "$VSCODE_BIN" ] && ! command -v code &>/dev/null; then
-  ln -sf "$VSCODE_BIN" /usr/local/bin/code 2>/dev/null || run_sudo ln -sf "$VSCODE_BIN" /usr/local/bin/code
-  record_installed "code symlink"
-elif command -v code &>/dev/null; then
-  record_skipped "code symlink" "already available"
+  # VS Code → code (usually handled by VS Code itself, but ensure it)
+  VSCODE_BIN="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+  if [ -f "$VSCODE_BIN" ] && ! command -v code &>/dev/null; then
+    ln -sf "$VSCODE_BIN" /usr/local/bin/code 2>/dev/null || run_sudo ln -sf "$VSCODE_BIN" /usr/local/bin/code
+    record_installed "code symlink"
+  elif command -v code &>/dev/null; then
+    record_skipped "code symlink" "already available"
+  fi
 fi
 
 # ── 6. Bun ────────────────────────────────────────────────────────────────────
@@ -689,7 +705,9 @@ fi
 # ── 8c. Claude Code ─────────────────────────────────────────────────────────
 set_step "installing Claude Code"
 
-if command -v claude &>/dev/null; then
+if [ "${INSTALL_CLAUDE_CODE:-true}" != true ]; then
+  record_skipped "Claude Code" "disabled by profile"
+elif command -v claude &>/dev/null; then
   record_skipped "Claude Code" "already installed"
 else
   echo ">>> Installing Claude Code..."
@@ -719,54 +737,58 @@ if [ "${INSTALL_RUST:-false}" = true ]; then
 fi
 
 # ── 10. Git config ───────────────────────────────────────────────────────────
-set_step "configuring git"
+if [ "${APPLY_GIT_CONFIG:-true}" = true ]; then
+  set_step "configuring git"
 
-echo ""
-echo ">>> Git configuration..."
+  echo ""
+  echo ">>> Git configuration..."
 
-# Global gitignore
-GITIGNORE_SRC="$SCRIPT_DIR/config/gitignore_global"
-GITIGNORE_DEST="$HOME/.gitignore_global"
-if [ -f "$GITIGNORE_SRC" ]; then
-  if [ -f "$GITIGNORE_DEST" ]; then
-    record_skipped "gitignore_global" "already exists"
-  else
-    cp "$GITIGNORE_SRC" "$GITIGNORE_DEST"
-    git config --global core.excludesfile "$GITIGNORE_DEST"
-    record_installed "gitignore_global"
+  # Global gitignore
+  GITIGNORE_SRC="$SCRIPT_DIR/config/gitignore_global"
+  GITIGNORE_DEST="$HOME/.gitignore_global"
+  if [ -f "$GITIGNORE_SRC" ]; then
+    if [ -f "$GITIGNORE_DEST" ]; then
+      record_skipped "gitignore_global" "already exists"
+    else
+      cp "$GITIGNORE_SRC" "$GITIGNORE_DEST"
+      git config --global core.excludesfile "$GITIGNORE_DEST"
+      record_installed "gitignore_global"
+    fi
   fi
-fi
 
-# Git defaults (idempotent — safe to re-run)
-git config --global init.defaultBranch main
-git config --global pull.rebase true
-git config --global push.autoSetupRemote true
-git config --global fetch.prune true
-git config --global diff.colorMoved default
-git config --global rebase.autoStash true
-record_installed "git defaults (init.defaultBranch, pull.rebase, push.autoSetupRemote, etc.)"
+  # Git defaults (idempotent — safe to re-run)
+  git config --global init.defaultBranch main
+  git config --global pull.rebase true
+  git config --global push.autoSetupRemote true
+  git config --global fetch.prune true
+  git config --global diff.colorMoved default
+  git config --global rebase.autoStash true
+  record_installed "git defaults (init.defaultBranch, pull.rebase, push.autoSetupRemote, etc.)"
 
-# User info (only if set in config.sh)
-if [ -n "${GIT_USER_NAME:-}" ]; then
-  git config --global user.name "$GIT_USER_NAME"
-  record_installed "git user.name → $GIT_USER_NAME"
+  # User info (only if set in config.sh)
+  if [ -n "${GIT_USER_NAME:-}" ]; then
+    git config --global user.name "$GIT_USER_NAME"
+    record_installed "git user.name → $GIT_USER_NAME"
+  else
+    if [ -z "$(git config --global user.name 2>/dev/null)" ]; then
+      record_skipped "git user.name" "not set — configure in config.sh or run: git config --global user.name 'Your Name'"
+    else
+      record_skipped "git user.name" "already set to '$(git config --global user.name)'"
+    fi
+  fi
+
+  if [ -n "${GIT_USER_EMAIL:-}" ]; then
+    git config --global user.email "$GIT_USER_EMAIL"
+    record_installed "git user.email → $GIT_USER_EMAIL"
+  else
+    if [ -z "$(git config --global user.email 2>/dev/null)" ]; then
+      record_skipped "git user.email" "not set — configure in config.sh or run: git config --global user.email 'you@example.com'"
+    else
+      record_skipped "git user.email" "already set to '$(git config --global user.email)'"
+    fi
+  fi
 else
-  if [ -z "$(git config --global user.name 2>/dev/null)" ]; then
-    record_skipped "git user.name" "not set — configure in config.sh or run: git config --global user.name 'Your Name'"
-  else
-    record_skipped "git user.name" "already set to '$(git config --global user.name)'"
-  fi
-fi
-
-if [ -n "${GIT_USER_EMAIL:-}" ]; then
-  git config --global user.email "$GIT_USER_EMAIL"
-  record_installed "git user.email → $GIT_USER_EMAIL"
-else
-  if [ -z "$(git config --global user.email 2>/dev/null)" ]; then
-    record_skipped "git user.email" "not set — configure in config.sh or run: git config --global user.email 'you@example.com'"
-  else
-    record_skipped "git user.email" "already set to '$(git config --global user.email)'"
-  fi
+  record_skipped "git configuration" "disabled by profile"
 fi
 
 # ── 11. Shell setup (optional) ───────────────────────────────────────────────
@@ -1019,6 +1041,15 @@ install_editor_extensions
 # ── 16. Post scripts ─────────────────────────────────────────────────────────
 set_step "running post-install scripts"
 
+if [ "${INSTALL_LAPTOP_TOOL_PATHS:-false}" = true ]; then
+  laptop_tool_paths_script="$SCRIPT_DIR/scripts/setup-laptop-tool-paths.sh"
+  if [ -x "$laptop_tool_paths_script" ]; then
+    run_cmd "laptop shell tool paths" "$laptop_tool_paths_script" || true
+  else
+    record_failed "laptop shell tool paths" "missing or not executable: $laptop_tool_paths_script"
+  fi
+fi
+
 for script in "${POST_SCRIPTS[@]-}"; do
   [ -z "$script" ] && continue
   script_path="$SCRIPT_DIR/$script"
@@ -1071,11 +1102,17 @@ done < "$CONFIG_FILE"
 
 echo ""
 echo "Next steps:"
-echo "  1. Open Tailscale and sign in"
-echo "  2. Open Chrome and sign in"
-echo "  3. Close this Terminal, open a new one, then:"
-echo "     cd ~/projects/openclaw-setup"
-echo "     cc"
+if [ "${SHOW_MINI_NEXT_STEPS:-true}" = true ]; then
+  echo "  1. Open Tailscale and sign in"
+  echo "  2. Open Chrome and sign in"
+  echo "  3. Close this Terminal, open a new one, then:"
+  echo "     cd ~/projects/openclaw-setup"
+  echo "     cc"
+else
+  echo "  1. Open Chrome and sign in"
+  echo "  2. Sign in to 1Password, Raycast, Notion, Zoom, Spokenly, ChatGPT, and Warp as needed"
+  echo "  3. Open a new Terminal so fnm and installed CLIs are available"
+fi
 echo ""
 # ── Handoff to Claude Code ───────────────────────────────────────────────────
 

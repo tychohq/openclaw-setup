@@ -11,7 +11,7 @@
 # Prerequisites: bash, jq, bun (for web tests), openclaw (for integration tests)
 # ──────────────────────────────────────────────────────────────────────────────
 
-.PHONY: test test-patches test-integration test-web test-aws test-ci help
+.PHONY: test test-patches test-integration test-web test-aws test-macos test-ci help
 
 SHELL := /bin/bash
 
@@ -40,12 +40,16 @@ test-aws: ## AWS script static validation
 	@echo "═══ AWS post-clone-setup tests ═══"
 	bash aws/scripts/tests/test-post-clone-setup.sh
 
+test-macos: ## macOS installer profile tests (mocked; safe on any host)
+	@echo "═══ macOS installer profile tests ═══"
+	bash macos/tests/test-setup-profiles.sh
+
 # ── Aggregate targets ────────────────────────────────────────────────────────
 
-test: test-patches test-web test-aws test-integration ## Run all tests
+test: test-patches test-web test-aws test-macos test-integration ## Run all tests
 	@echo ""
 	@echo "✅ All tests passed"
 
-test-ci: test-patches test-web test-aws ## Run all tests except integration (no openclaw needed)
+test-ci: test-patches test-web test-aws test-macos ## Run all tests except integration (no openclaw needed)
 	@echo ""
 	@echo "✅ CI tests passed (integration skipped)"

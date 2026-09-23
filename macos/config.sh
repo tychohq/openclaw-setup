@@ -90,9 +90,8 @@ CASKS=(
   # figma
 
   # AI
-  # chatgpt
   # claude
-  codex-app                # Codex desktop app
+  chatgpt                  # ChatGPT desktop app
   spokenly
 
   # Media
