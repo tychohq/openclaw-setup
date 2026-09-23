@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install zsh for fresh-shell tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
+
       - name: Test laptop and Mini profiles
         run: bash macos/tests/test-setup-profiles.sh
 
